@@ -1,6 +1,9 @@
-// School Management System — Phase 2
-// Mobile menu, program search, student records (localStorage, demo only),
-// demo enquiry form, footer year. No data is sent anywhere; everything runs in the browser.
+// School Management System — All 5 phases + Firebase realtime sync
+// Mobile menu, program search, student records, attendance, fees, results,
+// demo enquiry form, footer year, demo login with 4 roles.
+// Data syncs in realtime with the mobile app through Firebase Realtime
+// Database (shared root /ggdc-sms/); localStorage keeps an offline copy so
+// the app still works without internet. Demo data only — nothing real.
 
 (function () {
   'use strict';
@@ -9,6 +12,64 @@
   // Set by the login code at the end of this file; render functions below
   // check it so a role can never use an action it is not allowed.
   var currentUser = null;
+
+  // ---------- Firebase realtime sync (shared with the mobile app) ----------
+  // Public client config — safe to ship in code (the RTDB rules are what
+  // protect the data). Demo project only; no real student data.
+  var FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyCYrKxCjvvlyn8Euu2ITPNmtBG-R6y-hC8',
+    authDomain: 'ggdc-sukkur-sms.firebaseapp.com',
+    databaseURL: 'https://ggdc-sukkur-sms-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'ggdc-sukkur-sms',
+    storageBucket: 'ggdc-sukkur-sms.firebasestorage.app',
+    messagingSenderId: '1068130100899',
+    appId: '1:1068130100899:web:b1cde8e2f15c4993150116'
+  };
+  var FB_ROOT = 'ggdc-sms';
+  var FB = { ready: false, db: null };
+
+  // Display program name -> shared programmeId (same IDs as the mobile app).
+  var PROGRAMME_IDS = {
+    'FSc Pre-Medical': 'fsc-pre-medical',
+    'FSc Pre-Engineering': 'fsc-pre-engineering',
+    'FA Humanities': 'fa-humanities',
+    'ADS Science': 'ads-science',
+    'BS Computer Science': 'bs-computer-science',
+    'BSc Science': 'bsc-science',
+    'B.Com Commerce': 'bcom-commerce'
+  };
+  var PROGRAMME_NAMES = {};
+  Object.keys(PROGRAMME_IDS).forEach(function (n) { PROGRAMME_NAMES[PROGRAMME_IDS[n]] = n; });
+
+  function todayString() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function fbSet(path, value) {
+    if (!FB.ready) return;
+    try { FB.db.ref(path).set(value); } catch (e) { /* offline — the local cache keeps the app working */ }
+  }
+  function fbUpdate(path, value) {
+    if (!FB.ready) return;
+    try { FB.db.ref(path).update(value); } catch (e) { /* ignore */ }
+  }
+  function fbRemove(path) {
+    if (!FB.ready) return;
+    try { FB.db.ref(path).remove(); } catch (e) { /* ignore */ }
+  }
+  // RTDB turns objects with sequential numeric keys ("1".."14") into arrays
+  // with a null at index 0 — normalise both shapes to a plain array.
+  function fbObjectToArray(obj) {
+    if (!obj) return [];
+    if (Array.isArray(obj)) return obj.filter(function (v) { return v !== null && v !== undefined; });
+    return Object.keys(obj).map(function (k) { return obj[k]; });
+  }
+  function fbArrayToObject(arr, keyFn) {
+    var obj = {};
+    arr.forEach(function (item) { obj[keyFn(item)] = item; });
+    return obj;
+  }
 
   // Footer year
   var yearEl = document.getElementById('year');
@@ -57,7 +118,7 @@
     { id: 'GGDC-2026-001', name: 'Amina', program: 'FSc Pre-Medical', year: 'XI' },
     { id: 'GGDC-2026-002', name: 'Fatima', program: 'FSc Pre-Medical', year: 'XII' },
     { id: 'GGDC-2026-003', name: 'Zainab', program: 'FSc Pre-Engineering', year: 'XI' },
-    { id: 'GGDC-2026-004', name: 'Maryam', program: 'FA Humanities', year: 'XII' },
+    { id: 'GGDC-2026-004', name: 'Maryam', program: 'ADS Science', year: 'Part I' },
     { id: 'GGDC-2026-005', name: 'Sana', program: 'ADS Science', year: 'Part I' },
     { id: 'GGDC-2026-006', name: 'Hina', program: 'ADS Science', year: 'Part II' },
     { id: 'GGDC-2026-007', name: 'Noor', program: 'BS Computer Science', year: 'Year 1' },
@@ -65,19 +126,46 @@
     { id: 'GGDC-2026-009', name: 'Mahnoor', program: 'B.Com Commerce', year: 'Year 1' }
   ];
 
+  // One student object, used by both the local cache and Firebase:
+  // { id, name, program (display name), programmeId, programmeName,
+  //   year, yearPart, enrollmentDate }
+  function enrichStudent(s) {
+    var program = s.program || s.programmeName || PROGRAMME_NAMES[s.programmeId] || '';
+    return {
+      id: s.id, name: s.name,
+      program: program, programmeId: s.programmeId || PROGRAMME_IDS[program] || '',
+      programmeName: program,
+      year: s.year || s.yearPart || '', yearPart: s.yearPart || s.year || '',
+      enrollmentDate: s.enrollmentDate || '2026-11-08'
+    };
+  }
+
   function loadStudents() {
     try {
       var raw = window.localStorage.getItem(STUDENT_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length) return parsed;
+        if (Array.isArray(parsed) && parsed.length) return parsed.map(enrichStudent);
       }
     } catch (e) { /* localStorage unavailable — use in-memory seed */ }
-    return SEED_STUDENTS.slice();
+    return SEED_STUDENTS.map(enrichStudent);
   }
 
+  // localStorage is only the offline cache now — Firebase is the source of
+  // truth, and the listener below keeps this copy fresh.
   function saveStudents(list) {
     try { window.localStorage.setItem(STUDENT_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+  }
+
+  // Called by the Firebase listener: replace the list with the shared data.
+  function syncStudentsFromFirebase(obj) {
+    if (!obj) return;
+    var list = fbObjectToArray(obj).map(enrichStudent);
+    list.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+    if (!list.length) return;
+    students = list;
+    saveStudents(students);
+    renderStudents();
   }
 
   function escapeHtml(text) {
@@ -142,6 +230,7 @@
       var id = btn.getAttribute('data-delete');
       students = students.filter(function (s) { return s.id !== id; });
       saveStudents(students);
+      fbRemove(FB_ROOT + '/students/' + id);
       renderStudents();
     });
   }
@@ -162,11 +251,12 @@
         if (studentNote) studentNote.textContent = 'Please fill in the name, program and year / part.';
         return;
       }
-      var student = { id: nextStudentId(), name: name, program: program, year: year };
+      var student = enrichStudent({ id: nextStudentId(), name: name, program: program, year: year });
       students.push(student);
       saveStudents(students);
+      fbSet(FB_ROOT + '/students/' + student.id, student);
       renderStudents();
-      if (studentNote) studentNote.textContent = 'Added ' + name + ' (' + program + ', ' + year + ') — ID ' + student.id + '. Saved in this browser only (demo).';
+      if (studentNote) studentNote.textContent = 'Added ' + name + ' (' + program + ', ' + year + ') — ID ' + student.id + '. Synced to the mobile app too (Firebase, demo).';
       studentForm.reset();
     });
   }
@@ -175,8 +265,9 @@
   if (resetBtn) {
     resetBtn.addEventListener('click', function () {
       if (!currentUser || currentUser.role !== 'admin') return; // Admin only
-      students = SEED_STUDENTS.slice();
+      students = SEED_STUDENTS.map(enrichStudent);
       saveStudents(students);
+      fbSet(FB_ROOT + '/students', fbArrayToObject(students, function (s) { return s.id; }));
       renderStudents();
       if (studentNote) studentNote.textContent = 'Demo students reset to the original 9 sample students.';
     });
@@ -199,27 +290,33 @@
   }
 
 // ---------- Phase 3: Attendance ----------
-  // Sample demo rosters — generic names only, no real college students.
-  var ROSTER = {
-    'FSc Pre-Medical': ['Amina', 'Fatima', 'Sana', 'Hina', 'Maryam', 'Zainab'],
-    'FSc Pre-Engineering': ['Ayesha', 'Iqra', 'Noor', 'Sana', 'Fatima', 'Maryam'],
-    'FA Humanities': ['Hina', 'Zainab', 'Amina', 'Noor', 'Iqra', 'Fatima'],
-    'ADS Science': ['Maryam', 'Zainab', 'Amina', 'Ayesha', 'Sana', 'Hina'],
-    'BS Computer Science': ['Ayesha', 'Iqra', 'Noor', 'Amina', 'Fatima', 'Sana'],
-    'BSc Science': ['Zainab', 'Maryam', 'Hina', 'Ayesha', 'Iqra', 'Noor'],
-    'B.Com Commerce': ['Noor', 'Fatima', 'Amina', 'Zainab', 'Sana', 'Maryam']
-  };
+  // Attendance is keyed by student ID (not name) so it syncs with the
+  // mobile app: { programmeId: { date: { studentId: true/false } } }.
+  // The roster is the shared student list for that programme.
   var ATTENDANCE_KEY = 'ggdc-attendance-v1';
 
-  function loadAttendance() {
+  // In-memory copy of the shared attendance object; the Firebase listener
+  // keeps it fresh, localStorage is only the offline cache.
+  function loadAttendanceCache() {
     try {
       var raw = localStorage.getItem(ATTENDANCE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return JSON.parse(raw) || {};
     } catch (e) { /* fall through */ }
     return {};
   }
-  function saveAttendance(all) {
+  function saveAttendanceCache(all) {
     try { localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(all)); } catch (e) { /* storage unavailable */ }
+  }
+  var attendanceData = loadAttendanceCache();
+  function loadAttendance() { return attendanceData; }
+  function saveAttendance(all) {
+    attendanceData = all || {};
+    saveAttendanceCache(attendanceData);
+  }
+  function syncAttendanceFromFirebase(obj) {
+    attendanceData = obj || {};
+    saveAttendanceCache(attendanceData);
+    if (currentProgram && currentDate) renderAttendance();
   }
 
   var attForm = document.getElementById('attendanceForm');
@@ -241,7 +338,11 @@
     attDate.value = today.getFullYear() + '-' + mm + '-' + dd;
   }
 
-  function recordKey() { return currentProgram + '|' + currentDate; }
+  // Saved record for the picked programme + date (or null).
+  function attRecord() {
+    var pid = PROGRAMME_IDS[currentProgram] || '';
+    return (attendanceData[pid] && attendanceData[pid][currentDate]) || null;
+  }
 
   function updateSummary() {
     if (!attSummary || !attList) return;
@@ -263,12 +364,18 @@
 
   function renderAttendance() {
     if (!attList || !currentProgram || !currentDate) return;
-    var names = ROSTER[currentProgram] || [];
-    var all = loadAttendance();
-    var saved = all[recordKey()] || {};
+    var pid = PROGRAMME_IDS[currentProgram] || '';
+    var roster = students.filter(function (s) { return s.programmeId === pid; });
+    var saved = attRecord() || {};
     attList.innerHTML = '';
-    names.forEach(function (name, i) {
-      var status = saved[name] || 'present';
+    if (!roster.length) {
+      var empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.textContent = 'No students in ' + currentProgram + ' yet — add one in the Students section (Admin), then mark attendance here.';
+      attList.appendChild(empty);
+    }
+    roster.forEach(function (st, i) {
+      var status = saved[st.id] === false ? 'absent' : 'present';
       var row = document.createElement('div');
       row.className = 'attendance-row';
       row.innerHTML =
@@ -278,9 +385,9 @@
         '<label><input type="radio" name="att-' + i + '" value="present"> Present</label>' +
         '<label><input type="radio" name="att-' + i + '" value="absent"> Absent</label>' +
         '</div>';
-      row.querySelector('.student-name').textContent = name;
+      row.querySelector('.student-name').textContent = st.name;
       row.querySelector('.student-program').textContent = currentProgram + ' · Demo data';
-      row.dataset.student = name;
+      row.dataset.student = st.id;
       var radios = row.querySelectorAll('input[type="radio"]');
       var canMark = currentUser && (currentUser.role === 'admin' || currentUser.role === 'teacher');
       radios.forEach(function (r) {
@@ -299,8 +406,7 @@
       currentProgram = attProgram.value;
       currentDate = attDate.value;
       if (!currentProgram || !currentDate) return;
-      var all = loadAttendance();
-      var exists = !!all[recordKey()];
+      var exists = !!attRecord();
       if (attPanel) attPanel.hidden = false;
       renderAttendance();
       if (attSaved) attSaved.textContent = '';
@@ -317,16 +423,18 @@
     saveBtn.addEventListener('click', function () {
       if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
       if (!currentProgram || !currentDate) return;
-      var all = loadAttendance();
+      var pid = PROGRAMME_IDS[currentProgram] || '';
       var record = {};
       attList.querySelectorAll('.attendance-row').forEach(function (row) {
         var checked = row.querySelector('input[type="radio"]:checked');
-        record[row.dataset.student] = checked ? checked.value : 'present';
+        record[row.dataset.student] = !checked || checked.value === 'present';
       });
-      all[recordKey()] = record;
-      saveAttendance(all);
+      if (!attendanceData[pid]) attendanceData[pid] = {};
+      attendanceData[pid][currentDate] = record;
+      saveAttendance(attendanceData);
+      fbSet(FB_ROOT + '/attendance/' + pid + '/' + currentDate, record);
       updateSummary();
-      if (attSaved) attSaved.textContent = 'Attendance saved for ' + currentProgram + ' on ' + currentDate + '. Demo only — saved in this browser.';
+      if (attSaved) attSaved.textContent = 'Attendance saved for ' + currentProgram + ' on ' + currentDate + '. Demo only — synced to the mobile app too (Firebase).';
     });
   }
 
@@ -357,9 +465,10 @@
     clearBtn.addEventListener('click', function () {
       if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
       if (!currentProgram || !currentDate) return;
-      var all = loadAttendance();
-      delete all[recordKey()];
-      saveAttendance(all);
+      var pid = PROGRAMME_IDS[currentProgram] || '';
+      if (attendanceData[pid]) delete attendanceData[pid][currentDate];
+      saveAttendance(attendanceData);
+      fbRemove(FB_ROOT + '/attendance/' + pid + '/' + currentDate);
       renderAttendance();
       if (attSaved) attSaved.textContent = 'Saved record cleared for ' + currentProgram + ' on ' + currentDate + '.';
     });
@@ -368,35 +477,61 @@
 // ---- Phase 4: Fees record (demo only, localStorage) ----
   var FEES_KEY = 'ggdc-fees-v1';
   var SEED_FEES = [
-    { id: 1, name: 'Amina', program: 'FSc Pre-Medical', year: 'XI', amount: 4000, status: 'Paid' },
-    { id: 2, name: 'Fatima', program: 'FSc Pre-Medical', year: 'XII', amount: 4000, status: 'Pending' },
-    { id: 3, name: 'Sana', program: 'FSc Pre-Engineering', year: 'XI', amount: 4000, status: 'Pending' },
-    { id: 4, name: 'Hina', program: 'FSc Pre-Engineering', year: 'XII', amount: 4000, status: 'Paid' },
-    { id: 5, name: 'Maryam', program: 'FA Humanities', year: 'XI', amount: 2500, status: 'Pending' },
-    { id: 6, name: 'Zainab', program: 'FA Humanities', year: 'XII', amount: 2500, status: 'Paid' },
-    { id: 7, name: 'Iqra', program: 'ADS Science', year: 'Part I', amount: 3500, status: 'Paid' },
-    { id: 8, name: 'Noor', program: 'ADS Science', year: 'Part II', amount: 3500, status: 'Pending' },
-    { id: 9, name: 'Ayesha', program: 'BS Computer Science', year: 'Year 2', amount: 5000, status: 'Pending' },
-    { id: 10, name: 'Rabia', program: 'BS Computer Science', year: 'Year 1', amount: 5000, status: 'Paid' },
-    { id: 11, name: 'Sara', program: 'BSc Science', year: 'Year 1', amount: 3000, status: 'Pending' },
-    { id: 12, name: 'Mahnoor', program: 'BSc Science', year: 'Year 2', amount: 3000, status: 'Paid' },
-    { id: 13, name: 'Kiran', program: 'B.Com Commerce', year: 'Year 1', amount: 2000, status: 'Pending' },
-    { id: 14, name: 'Saba', program: 'B.Com Commerce', year: 'Year 2', amount: 2000, status: 'Paid' }
+    { id: 1, name: 'Amina', studentId: 'GGDC-2026-001', program: 'FSc Pre-Medical', year: 'XI', amount: 4000, status: 'Paid', receiptId: 'RCP-001', updatedAt: '2026-11-08' },
+    { id: 2, name: 'Fatima', studentId: 'GGDC-2026-002', program: 'FSc Pre-Medical', year: 'XII', amount: 4000, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 3, name: 'Sana', studentId: 'GGDC-2026-005', program: 'FSc Pre-Engineering', year: 'XI', amount: 4000, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 4, name: 'Hina', studentId: 'GGDC-2026-006', program: 'FSc Pre-Engineering', year: 'XII', amount: 4000, status: 'Paid', receiptId: 'RCP-002', updatedAt: '2026-11-08' },
+    { id: 5, name: 'Maryam', studentId: 'GGDC-2026-004', program: 'FA Humanities', year: 'XI', amount: 2500, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 6, name: 'Zainab', studentId: 'GGDC-2026-003', program: 'FA Humanities', year: 'XII', amount: 2500, status: 'Paid', receiptId: 'RCP-003', updatedAt: '2026-11-08' },
+    { id: 7, name: 'Iqra', studentId: null, program: 'ADS Science', year: 'Part I', amount: 3500, status: 'Paid', receiptId: 'RCP-004', updatedAt: '2026-11-08' },
+    { id: 8, name: 'Noor', studentId: 'GGDC-2026-007', program: 'ADS Science', year: 'Part II', amount: 3500, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 9, name: 'Ayesha', studentId: null, program: 'BS Computer Science', year: 'Year 2', amount: 5000, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 10, name: 'Rabia', studentId: null, program: 'BS Computer Science', year: 'Year 1', amount: 5000, status: 'Paid', receiptId: 'RCP-005', updatedAt: '2026-11-08' },
+    { id: 11, name: 'Sara', studentId: 'GGDC-2026-008', program: 'BSc Science', year: 'Year 1', amount: 3000, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 12, name: 'Mahnoor', studentId: 'GGDC-2026-009', program: 'BSc Science', year: 'Year 2', amount: 3000, status: 'Paid', receiptId: 'RCP-006', updatedAt: '2026-11-08' },
+    { id: 13, name: 'Kiran', studentId: null, program: 'B.Com Commerce', year: 'Year 1', amount: 2000, status: 'Pending', updatedAt: '2026-11-08' },
+    { id: 14, name: 'Saba', studentId: null, program: 'B.Com Commerce', year: 'Year 2', amount: 2000, status: 'Paid', receiptId: 'RCP-007', updatedAt: '2026-11-08' }
   ];
+
+  // One fee object, used by both the local cache and Firebase:
+  // { id (string), studentId, studentName/name, program, programmeId,
+  //   programmeName, year, yearPart, amount, status, receiptId, updatedAt }
+  function enrichFee(f) {
+    var program = f.program || f.programmeName || PROGRAMME_NAMES[f.programmeId] || '';
+    return {
+      id: String(f.id), studentId: f.studentId || null,
+      studentName: f.studentName || f.name || '', name: f.studentName || f.name || '',
+      program: program, programmeId: f.programmeId || PROGRAMME_IDS[program] || '',
+      programmeName: program,
+      year: f.year || f.yearPart || '', yearPart: f.yearPart || f.year || '',
+      amount: f.amount, status: f.status,
+      receiptId: f.receiptId || null, updatedAt: f.updatedAt || '2026-11-08'
+    };
+  }
 
   function loadFees() {
     try {
       var raw = window.localStorage.getItem(FEES_KEY);
-      if (!raw) return SEED_FEES.map(function (f) { return Object.assign({}, f); });
+      if (!raw) return SEED_FEES.map(enrichFee);
       var parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return SEED_FEES.map(function (f) { return Object.assign({}, f); });
-      return parsed;
+      if (!Array.isArray(parsed) || parsed.length === 0) return SEED_FEES.map(enrichFee);
+      return parsed.map(enrichFee);
     } catch (e) {
-      return SEED_FEES.map(function (f) { return Object.assign({}, f); });
+      return SEED_FEES.map(enrichFee);
     }
   }
+  // localStorage is only the offline cache — Firebase is the source of truth.
   function saveFees(fees) {
     try { window.localStorage.setItem(FEES_KEY, JSON.stringify(fees)); } catch (e) { /* storage unavailable — demo still works in memory */ }
+  }
+  function syncFeesFromFirebase(obj) {
+    if (!obj) return;
+    var list = fbObjectToArray(obj).map(enrichFee);
+    list.sort(function (a, b) { return parseInt(a.id, 10) - parseInt(b.id, 10); });
+    if (!list.length) return;
+    fees = list;
+    saveFees(fees);
+    renderFees();
   }
   function formatPKR(n) { return 'Rs. ' + n.toLocaleString('en-US'); }
 
@@ -466,7 +601,10 @@
         btn.addEventListener('click', function () {
           if (!currentUser || currentUser.role !== 'admin') return; // Admin only
           f.status = 'Paid';
+          f.receiptId = f.receiptId || ('RCP-' + String(f.id).padStart(3, '0'));
+          f.updatedAt = todayString();
           saveFees(fees);
+          fbUpdate(FB_ROOT + '/fees/' + f.id, { status: 'Paid', receiptId: f.receiptId, updatedAt: f.updatedAt });
           renderFees();
         });
         actions.appendChild(btn);
@@ -487,8 +625,9 @@
     if (resetFees) {
       resetFees.addEventListener('click', function () {
         if (!currentUser || currentUser.role !== 'admin') return; // Admin only
-        fees = SEED_FEES.map(function (f) { return Object.assign({}, f); });
+        fees = SEED_FEES.map(enrichFee);
         saveFees(fees);
+        fbSet(FB_ROOT + '/fees', fbArrayToObject(fees, function (f) { return f.id; }));
         if (feeProgram) feeProgram.value = '';
         if (feeStatus) feeStatus.value = '';
         renderFees();
@@ -500,7 +639,7 @@
   // Marks are out of 100 per subject (4 subjects per program, total out of 400).
   // All marks are SAMPLE DEMO DATA. ADS subjects are the real ADS subjects
   // (English, Bio-Chemistry, Zoology, Botany) but the marks are invented samples.
-  var RESULTS = {
+  var RESULTS_SEED = {
     'FSc Pre-Medical': {
       subjects: ['Biology', 'Chemistry', 'Physics', 'English'],
       students: [
@@ -577,6 +716,69 @@
     return 'Fail';
   }
   function isPass(pct) { return pct >= 40; }
+
+  // Live results come from Firebase; the static table above is the seed
+  // (and the offline fallback) — same marks, reshaped for the shared store.
+  var RESULTS = RESULTS_SEED;
+
+  // Called by the Firebase listener: rebuild the results table from the
+  // shared data ({ programmeId: { subjects, students: { id: {...} } } }).
+  function syncResultsFromFirebase(obj) {
+    if (!obj) return;
+    var next = {};
+    Object.keys(obj).forEach(function (pid) {
+      var prog = obj[pid] || {};
+      var display = PROGRAMME_NAMES[pid] || pid;
+      var subjects = prog.subjects || [];
+      var studentsObj = prog.students || {};
+      var list = Object.keys(studentsObj).map(function (sid) {
+        var r = studentsObj[sid] || {};
+        var marks = subjects.map(function (sub) {
+          return (r.subjectMarks && r.subjectMarks[sub] != null) ? r.subjectMarks[sub] : null;
+        });
+        return { name: r.studentName || '', year: r.yearPart || r.year || '', marks: marks };
+      });
+      list = list.filter(function (s) { return s.marks.every(function (m) { return m !== null; }); });
+      if (list.length) next[display] = { subjects: subjects, students: list };
+    });
+    if (Object.keys(next).length) {
+      RESULTS = next;
+      renderResults();
+      if (currentUser && (currentUser.role === 'student' || currentUser.role === 'parent')) renderMyRecord();
+    }
+  }
+
+  // Build the one-time seed payload for /ggdc-sms/ from the local seeds.
+  // Student IDs match by (name, programme); other result rows get a
+  // deterministic GGDC-2026-1xx ID, in table order.
+  function buildSeedPayload() {
+    var studentsObj = fbArrayToObject(SEED_STUDENTS.map(enrichStudent), function (s) { return s.id; });
+    var feesObj = fbArrayToObject(SEED_FEES.map(enrichFee), function (f) { return f.id; });
+    var resultsObj = {};
+    var synth = 100;
+    Object.keys(RESULTS_SEED).forEach(function (program) {
+      var pid = PROGRAMME_IDS[program];
+      var data = RESULTS_SEED[program];
+      var recs = {};
+      data.students.forEach(function (s) {
+        var match = null;
+        SEED_STUDENTS.forEach(function (st) { if (st.name === s.name && st.program === program) match = st; });
+        var sid = match ? match.id : 'GGDC-2026-' + (++synth);
+        var total = totalMarks(s.marks);
+        var pct = pctOf(total, data.subjects.length * 100);
+        var sm = {};
+        data.subjects.forEach(function (sub, i) { sm[sub] = s.marks[i]; });
+        recs[sid] = {
+          studentId: sid, studentName: s.name, programmeId: pid,
+          yearPart: s.year, year: s.year,
+          subjectMarks: sm, overallPercentage: Math.round(pct * 100) / 100,
+          grade: gradeFor(pct), isPass: isPass(pct)
+        };
+      });
+      resultsObj[pid] = { subjects: data.subjects.slice(), students: recs };
+    });
+    return { students: studentsObj, attendance: {}, fees: feesObj, results: resultsObj };
+  }
 
   var resultProgram = document.getElementById('resultProgram');
   var resultHead = document.getElementById('resultHead');
@@ -713,12 +915,13 @@
 
     // Attendance: count Maryam's saved marks across ADS Science records.
     var att = loadAttendance();
+    var myPid = PROGRAMME_IDS[MY_STUDENT_PROGRAM] || '';
     var presentDays = 0, absentDays = 0;
-    Object.keys(att).forEach(function (key) {
-      if (key.indexOf(MY_STUDENT_PROGRAM + '|') !== 0) return;
-      var rec = att[key] || {};
-      if (rec[MY_STUDENT_NAME] === 'present') presentDays += 1;
-      else if (rec[MY_STUDENT_NAME] === 'absent') absentDays += 1;
+    var myAtt = (att && att[myPid]) || {};
+    Object.keys(myAtt).forEach(function (date) {
+      var rec = myAtt[date] || {};
+      if (rec[MY_STUDENT_ID] === true) presentDays += 1;
+      else if (rec[MY_STUDENT_ID] === false) absentDays += 1;
     });
     var attDays = presentDays + absentDays;
     var attPct = attDays ? Math.round(presentDays / attDays * 100) : null;
@@ -891,5 +1094,29 @@
     }
   } catch (e) { /* ignore — start logged out */ }
   applyRole();
+
+  // ---------- Firebase init: anonymous sign-in, seed if empty, live listeners ----------
+  function firebaseInit() {
+    if (!window.firebase || !window.firebase.database || !window.firebase.auth) return; // CDN blocked / offline — localStorage mode
+    try {
+      if (!window.firebase.apps.length) window.firebase.initializeApp(FIREBASE_CONFIG);
+      FB.db = window.firebase.database();
+      FB.ready = true;
+      try { window.firebase.auth().signInAnonymously().catch(function () { /* writes still work in test mode */ }); } catch (e) { /* ignore */ }
+      var rootRef = FB.db.ref(FB_ROOT);
+      rootRef.once('value').then(function (snap) {
+        if (!snap.exists()) {
+          try { rootRef.set(buildSeedPayload()); } catch (e) { /* ignore */ }
+        }
+      }).catch(function () { /* offline — the cache keeps the app working */ });
+      FB.db.ref(FB_ROOT + '/students').on('value', function (snap) { try { syncStudentsFromFirebase(snap.val()); } catch (e) { /* ignore */ } });
+      FB.db.ref(FB_ROOT + '/attendance').on('value', function (snap) { try { syncAttendanceFromFirebase(snap.val()); } catch (e) { /* ignore */ } });
+      FB.db.ref(FB_ROOT + '/fees').on('value', function (snap) { try { syncFeesFromFirebase(snap.val()); } catch (e) { /* ignore */ } });
+      FB.db.ref(FB_ROOT + '/results').on('value', function (snap) { try { syncResultsFromFirebase(snap.val()); } catch (e) { /* ignore */ } });
+    } catch (e) {
+      FB.ready = false;
+    }
+  }
+  firebaseInit();
 
 })();

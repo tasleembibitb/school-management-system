@@ -98,15 +98,15 @@
         </article>
         <article class="about-card">
           <h3>&#128100; Phase 2 — Done</h3>
-          <p>Student records — add a student and search students by name or program. Records are saved in the browser (localStorage, demo only).</p>
+          <p>Student records — add a student and search students by name or program. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser.</p>
         </article>
         <article class="about-card">
           <h3>&#9989; Phase 3 — Done</h3>
-          <p>Attendance — pick a program and a date, mark students present or absent, and see the day's summary. Saved in this browser only (demo).</p>
+          <p>Attendance — pick a program and a date, mark students present or absent, and see the day's summary. Synced in realtime with the mobile app (Firebase, demo).</p>
         </article>
         <article class="about-card">
           <h3>&#128179; Phase 4 — Done</h3>
-          <p>Fees record — see paid and pending fees, mark a fee as paid, and view the collection summary. Saved in this browser only (demo).</p>
+          <p>Fees record — see paid and pending fees, mark a fee as paid, and view the collection summary. Synced in realtime with the mobile app (Firebase, demo).</p>
         </article>
         <article class="about-card">
           <h3>&#128202; Phase 5 — Done</h3>
@@ -184,7 +184,7 @@
     <!-- STUDENTS — PHASE 2 -->
     <section id="students" class="section container">
       <h2>Students</h2>
-      <p class="muted">Student records — add a student and search students by name or program. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <p class="muted">Student records — add a student and search students by name or program. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser. All students below are sample demo data — generic names only, no real college students.</p>
       <p class="view-only-note" id="studentsViewNote" hidden>View only — Teacher account: students dekh sakte hain, add ya remove nahi kar sakte. Sirf Admin add ya remove kar sakta hai.</p>
       <form id="studentForm" class="contact-form">
         <label for="studentName">Student name</label>
@@ -234,13 +234,13 @@
       <div class="classes-grid" id="studentsGrid"></div>
       <p class="muted" id="studentNoResults" hidden>No student matches your search. Try a name like “Amina” or a program like “ADS Science”.</p>
       <button class="btn btn-outline" id="resetStudents" type="button">Reset demo students</button>
-      <p class="muted">Demo data — names are samples only. Added students stay in this browser until you reset them.</p>
+      <p class="muted">Demo data — names are samples only. Added students sync to the mobile app too, and stay until you reset them.</p>
     </section>
 
 <!-- ATTENDANCE — PHASE 3 -->
     <section id="attendance" class="section container">
       <h2>Attendance</h2>
-      <p class="muted">Mark attendance — pick a program and a date, mark each student Present or Absent, then save. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <p class="muted">Mark attendance — pick a program and a date, mark each student Present or Absent, then save. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser. All students below are sample demo data — generic names only, no real college students.</p>
       <form id="attendanceForm" class="contact-form">
         <label for="attendanceProgram">Program</label>
         <select id="attendanceProgram" required>
@@ -274,7 +274,7 @@
 <!-- FEES — PHASE 4 -->
     <section id="fees" class="section container">
       <h2>Fees Record</h2>
-      <p class="muted">Fees record — choose a program to see its students' fee status, and mark a fee as Paid. Fee amounts are sample demo amounts only (per term, in PKR) — not the college's real fees. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <p class="muted">Fees record — choose a program to see its students' fee status, and mark a fee as Paid. Fee amounts are sample demo amounts only (per term, in PKR) — not the college's real fees. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser. All students below are sample demo data — generic names only, no real college students.</p>
       <p class="view-only-note" id="feesViewNote" hidden>View only — Teacher account: fees dekh sakte hain, Paid mark nahi kar sakte. Sirf Admin fees change kar sakta hai.</p>
       <div class="summary-grid" id="feesSummary">
         <article class="summary-card summary-collected">
@@ -316,7 +316,7 @@
       <div class="fees-list" id="feesList"></div>
       <p class="muted" id="feeNoResults" hidden>No fee record matches. Try another program or status.</p>
       <button class="btn btn-outline" id="resetFees" type="button">Reset demo fees</button>
-      <p class="muted">Demo data — fee amounts are samples only, not real college fees. Paid marks stay in this browser until you reset them.</p>
+      <p class="muted">Demo data — fee amounts are samples only, not real college fees. Paid marks sync to the mobile app too, and stay until you reset them.</p>
     </section>
 
 <!-- RESULTS — PHASE 5 -->
@@ -383,6 +383,10 @@
     </div>
   </footer>
 
+  <!-- Firebase (Realtime Database) — syncs data live with the mobile app. -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ A College Management System for Government Girls Degree College, Sukkur, Sindh, 
 
 ## Login — 4 demo roles
 
-The app opens with a login page. **Demo login only — no real accounts, no backend, no passwords are sent anywhere.** The login session is kept in the browser's sessionStorage, so a refresh keeps you logged in; Logout ends it.
+The app opens with a login page. **Demo login only — no real accounts; the login itself is checked locally in the browser and no password is sent anywhere.** Student, attendance, fees and results data syncs in realtime with the mobile app through Firebase Realtime Database (shared data at `/ggdc-sms/`), with an offline copy kept in the browser. The login session is kept in the browser's sessionStorage, so a refresh keeps you logged in; Logout ends it.
 
 | Demo account | Password | Role | What it can do |
 |---|---|---|---|
@@ -48,16 +48,16 @@ The app opens with a login page. **Demo login only — no real accounts, no back
   - Programs in the form: all **7 verified programs** — FSc Pre-Medical, FSc Pre-Engineering, FA Humanities, ADS Science, BS Computer Science, BSc Science, B.Com Commerce
   - Year / Part options: XI, XII, Part I, Part II, Year 1, Year 2, Year 3, Year 4
   - Each added student gets an automatic demo ID (GGDC-2026-010, …)
-- **Storage:** students are saved in the browser's localStorage (key `ggdc-sms-students-v1`, demo only, no server, nothing sent anywhere). Added students stay in the browser until reset.
-- **Seed data:** 9 sample demo students (generic names only) — Amina (FSc Pre-Medical, XI), Fatima (FSc Pre-Medical, XII), Zainab (FSc Pre-Engineering, XI), Maryam (FA Humanities, XII), Sana (ADS Science, Part I), Hina (ADS Science, Part II), Noor (BS Computer Science, Year 1), Sara (BSc Science, Year 2), Mahnoor (B.Com Commerce, Year 1)
+- **Storage:** students sync in realtime with the mobile app through Firebase Realtime Database (shared root `/ggdc-sms/students`, keyed by student ID); an offline copy is kept in the browser's localStorage (key `ggdc-sms-students-v1`). Added students appear in the APK within seconds, and vice versa.
+- **Seed data:** 9 sample demo students (generic names only) — Amina (FSc Pre-Medical, XI), Fatima (FSc Pre-Medical, XII), Zainab (FSc Pre-Engineering, XI), Maryam (ADS Science, Part I), Sana (ADS Science, Part I), Hina (ADS Science, Part II), Noor (BS Computer Science, Year 1), Sara (BSc Science, Year 2), Mahnoor (B.Com Commerce, Year 1)
 - **Remove & reset:** any student card can be removed (demo), and "Reset demo students" restores the original 9 sample students.
 
 ## Phase 3 — Done: Attendance
 
-- **Attendance section:** pick a program (all 7 programs) and a date, see a list of 6 sample demo students for that program, mark each Present / Absent, and save. A saved record reloads when you pick the same program and date again.
+- **Attendance section:** pick a program (all 7 programs) and a date, see the students of that program (from the shared student list), mark each Present / Absent, and save. A saved record reloads when you pick the same program and date again, on the website and in the mobile app.
 - **Live summary:** total students, present, absent, and present percentage update as you mark.
 - **Buttons:** Mark all present, Mark all absent, Clear saved record.
-- **Storage:** records are saved in the browser's localStorage (key `ggdc-attendance-v1`, keyed by program + date, demo only).
+- **Storage:** records sync in realtime with the mobile app through Firebase Realtime Database (shared root `/ggdc-sms/attendance`, keyed by programme → date → student ID, `true` = present); an offline copy is kept in the browser's localStorage (key `ggdc-attendance-v1`).
 - All student names are generic sample demo data only — no real students or staff.
 
 ## Phase 4 — Done: Fees record
@@ -67,13 +67,31 @@ The app opens with a login page. **Demo login only — no real accounts, no back
   - FSc Pre-Medical — Rs. 4,000 | FSc Pre-Engineering — Rs. 4,000 | FA Humanities — Rs. 2,500
   - ADS Science — Rs. 3,500 | BS Computer Science — Rs. 5,000 | BSc Science — Rs. 3,000 | B.Com Commerce — Rs. 2,000
   - Seed totals: **Rs. 24,000 collected (7 paid) and Rs. 24,000 pending (7 pending)** out of Rs. 48,000 total
-- **Mark a fee as Paid** — saved in the browser only (localStorage key `ggdc-fees-v1`, demo only); the summary (total collected, total pending, paid/pending counts) updates live. "Reset demo fees" restores the seed data.
+- **Mark a fee as Paid** — synced in realtime with the mobile app (Firebase, shared root `/ggdc-sms/fees`, keyed by fee ID 1–14); an offline copy is kept in the browser (localStorage key `ggdc-fees-v1`). The summary (total collected, total pending, paid/pending counts) updates live. "Reset demo fees" restores the seed data.
 
 ## Phase 5 — Done: Result report
 
 - **Results section:** choose any of the 7 programs and see sample demo students with marks per subject (out of 100 each, total out of 400), percentage and grade — A (85%+), B (70–84%), C (60–69%), D (50–59%), E (40–49%), Fail (below 40%); pass means 40% or more.
 - **Class summary** for the chosen program: class average, top student, pass count (e.g. ADS Science: average 67.3%, top student Maryam 85.0%, 4 of 4 passed).
 - ADS Science uses the real ADS subjects (English, Bio-Chemistry, Zoology, Botany) — but all marks are invented sample demo data. Tasleem's own ADS marks and seat number are NOT used anywhere.
+- **Storage:** results sync in realtime with the mobile app through Firebase Realtime Database (shared root `/ggdc-sms/results`, keyed by programme → student ID); the same marks and grades show on the website and in the APK.
+
+## Realtime sync — web app ↔ mobile app (Firebase)
+
+Both apps read and write one shared Firebase Realtime Database (free Spark plan, project `ggdc-sukkur-sms`, region Singapore), root `/ggdc-sms/`:
+
+| Data | Shared shape |
+|---|---|
+| Students | `/students/<ID>` — `{ id, name, programmeId, programmeName, yearPart, enrollmentDate }` |
+| Attendance | `/attendance/<programmeId>/<date>/<studentId>` — `true` = present, `false` = absent |
+| Fees | `/fees/<1–14>` — `{ id, studentId, studentName, programmeId, amount, status, receiptId, updatedAt }` |
+| Results | `/results/<programmeId>/students/<studentId>` — `{ studentName, subjectMarks, overallPercentage, grade, isPass }` |
+
+- The database was seeded once with the demo data (9 students, 14 fee records, 24 result records, empty attendance). Both apps seed it again only if it is ever empty.
+- The web app loads the Firebase JS SDK from the Google CDN (`firebase-app-compat.js`, `firebase-auth-compat.js`, `firebase-database-compat.js`, v10.12.2) and signs in anonymously; the mobile app uses the `firebase` npm package with the same config. The Firebase web config in the code is public client config by design — the database rules are what protect the data (test-mode rules until 8 Dec 2026; they must be tightened before then).
+- The demo login (admin / teacher / student / parent, password `demo123`) is **not** Firebase — it is still checked locally in each app, exactly as before.
+- Verified end-to-end (2026-11-08): a student added on the website appeared in the live database and in the mobile store within seconds; a fee marked Paid in the mobile store appeared in the database; attendance saved on the website appeared in the database — and the test writes were removed afterwards, so the shared data is back to the seed (9 students, Rs. 24,000 / Rs. 24,000 fees, ADS average 67.3%).
+- One deliberate difference: the mobile app's Results screen shows exactly the shared result records (same as the website). A student added later gets no invented result row on either app.
 
 ## How to run
 
