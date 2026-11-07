@@ -1,0 +1,12 @@
+# APKs — built separately, not committed for now
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Android / Capacitor build output (if the mobile app is built from this repo later)
+android/
+node_modules/
+dist/
+build/
+.DS_Store

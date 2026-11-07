@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="School Management System — Phase 1: landing page and programs list for Government Girls Degree College, Sukkur, Sindh, Pakistan. Demo project built by Tasleem Bibi.">
+  <title>Government Girls Degree College, Sukkur | School Management System — Phase 1</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <nav class="nav container">
+      <a href="#home" class="logo"><span class="logo-mark">TB</span> College Management System</a>
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu" aria-expanded="false">&#9776;</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#classes">Programs</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section id="home" class="hero container">
+      <div>
+        <p class="eyebrow">Sukkur &middot; Sindh &middot; Pakistan</p>
+        <h1>Government Girls Degree College, Sukkur</h1>
+        <p class="motto">Discipline &middot; Dedication &middot; Excellence</p>
+        <p class="demo-badge">Demo Project &middot; Built by Tasleem Bibi</p>
+        <p>A simple College Management System for Government Girls Degree College, Sukkur. Phase 1 shows the college landing page and the programs list — Intermediate (XI &amp; XII) and degree programs, with main subjects and student numbers (sample demo data).</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#classes">View Programs</a>
+          <a class="btn btn-outline" href="#about">How it works</a>
+        </div>
+        <p class="hero-note">Phase 1 of 5 &middot; HTML, CSS &amp; JavaScript only &middot; No sign-in needed</p>
+      </div>
+      <div class="hero-card">
+        <p class="hero-card-big">&#127891;</p>
+        <p><strong>Intermediate &amp; Degree Programs</strong></p>
+        <p><strong id="heroStudents">419</strong> students &middot; <strong>6</strong> programs</p>
+        <p class="muted">Demo data — student numbers on this page are sample data for demonstration only.</p>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about" class="section container">
+      <h2>About this system</h2>
+      <p class="muted">This is a demo project. It shows how a degree college in Sukkur could keep its programs, students, attendance, fees and results in one place — starting simple, then adding one feature at a time.</p>
+      <div class="about-grid">
+        <article class="about-card">
+          <h3>&#128197; Phase 1 — Done</h3>
+          <p>Landing page and programs list (FSc, FA, ADS, BS, BSc). Responsive layout, mobile menu, program search.</p>
+        </article>
+        <article class="about-card">
+          <h3>&#128100; Phase 2 — Next</h3>
+          <p>Student records — add a student and search students by name or program.</p>
+        </article>
+        <article class="about-card">
+          <h3>&#9989; Phase 3 — Planned</h3>
+          <p>Attendance — mark students present or absent, day by day.</p>
+        </article>
+        <article class="about-card">
+          <h3>&#128179; Phase 4 — Planned</h3>
+          <p>Fees record — track which fees are paid and which are pending.</p>
+        </article>
+        <article class="about-card">
+          <h3>&#128202; Phase 5 — Planned</h3>
+          <p>Result report — marks and grades for each program.</p>
+        </article>
+        <article class="about-card">
+          <h3>&#127891; Who built it</h3>
+          <p>Tasleem Bibi, final-year BSCS student, Begum Nusrat Bhutto Women University, Sukkur. PITP Certified Web Developer &amp; Data Scientist. She studied ADS Science at this college.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- PROGRAMS -->
+    <section id="classes" class="section container">
+      <h2>Programs</h2>
+      <p class="muted">Intermediate (XI &amp; XII) and degree programs. Use the search box to find a program. All student numbers below are sample demo data.</p>
+      <div class="search-row">
+        <label for="classSearch">Search programs</label>
+        <input type="search" id="classSearch" placeholder="Try: ADS Science, or FSc…" autocomplete="off">
+        <p class="muted" id="classCount">Showing 6 programs</p>
+      </div>
+      <div class="classes-grid" id="classesGrid">
+        <article class="class-card" data-search="fsc pre-medical xi xii intermediate biology chemistry physics english">
+          <p class="class-num">FSc Pre-Medical</p>
+          <h3>Intermediate — XI &amp; XII</h3>
+          <p><strong>Subjects:</strong> Biology, Chemistry, Physics, English</p>
+          <p><strong>Students:</strong> 96</p>
+          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+        <article class="class-card" data-search="fsc pre-engineering xi xii intermediate mathematics maths chemistry physics english">
+          <p class="class-num">FSc Pre-Engineering</p>
+          <h3>Intermediate — XI &amp; XII</h3>
+          <p><strong>Subjects:</strong> Mathematics, Chemistry, Physics, English</p>
+          <p><strong>Students:</strong> 84</p>
+          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+        <article class="class-card" data-search="fa humanities xi xii intermediate civics economics education english">
+          <p class="class-num">FA Humanities</p>
+          <h3>Intermediate — XI &amp; XII</h3>
+          <p><strong>Subjects:</strong> Civics, Economics, Education, English</p>
+          <p><strong>Students:</strong> 62</p>
+          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+        <article class="class-card" data-search="ads science associate degree part i ii salu english bio-chemistry biochemistry zoology botany">
+          <p class="class-num">ADS Science</p>
+          <h3>Associate Degree — Part I &amp; II</h3>
+          <p><strong>Subjects:</strong> English, Bio-Chemistry, Zoology, Botany</p>
+          <p><strong>Students:</strong> 74</p>
+          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+        <article class="class-card" data-search="bs computer science 4 year degree programming data structures databases web development">
+          <p class="class-num">BS Computer Science</p>
+          <h3>4-Year Degree</h3>
+          <p><strong>Subjects:</strong> Programming, Data Structures, Databases, Web Development</p>
+          <p><strong>Students:</strong> 58</p>
+          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+        <article class="class-card" data-search="bsc science 2 year degree botany zoology chemistry english">
+          <p class="class-num">BSc Science</p>
+          <h3>2-Year Degree</h3>
+          <p><strong>Subjects:</strong> Botany, Zoology, Chemistry, English</p>
+          <p><strong>Students:</strong> 45</p>
+          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+      </div>
+      <p class="muted" id="noResults" hidden>No program matches your search. Try “ADS Science” or “FSc”.</p>
+    </section>
+
+    <!-- CONTACT -->
+    <section id="contact" class="section container">
+      <h2>Contact</h2>
+      <p class="muted">Demo college — Sukkur, Sindh, Pakistan. This is a demo page, so there is no real phone number or email address here. Use the form below to see how a student enquiry would look; nothing is sent anywhere.</p>
+      <form id="enquiryForm" class="contact-form">
+        <label for="enquiryName">Your name</label>
+        <input type="text" id="enquiryName" placeholder="Your name" required>
+        <label for="enquiryClass">Program you are asking about</label>
+        <select id="enquiryClass" required>
+          <option value="">Choose a program…</option>
+          <option>FSc Pre-Medical (XI)</option>
+          <option>FSc Pre-Medical (XII)</option>
+          <option>FSc Pre-Engineering (XI)</option>
+          <option>FSc Pre-Engineering (XII)</option>
+          <option>FA Humanities (XI)</option>
+          <option>FA Humanities (XII)</option>
+          <option>ADS Science (Part I)</option>
+          <option>ADS Science (Part II)</option>
+          <option>BS Computer Science</option>
+          <option>BSc Science</option>
+          <option>B.Com Commerce</option>
+        </select>
+        <label for="enquiryMessage">Message</label>
+        <textarea id="enquiryMessage" rows="4" placeholder="e.g. I would like to know about admissions for ADS Science Part I." required></textarea>
+        <button class="btn btn-primary" type="submit">Send enquiry (demo)</button>
+        <p class="muted" id="enquiryNote" role="status"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p><strong>Government Girls Degree College, Sukkur</strong> — demo project for this college, not the college's official site.</p>
+      <p>College Management System, Phase 1 &middot; Demo Project &middot; Built by Tasleem Bibi &middot; Sukkur, Sindh, Pakistan &middot; <span id="year"></span></p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
