@@ -5,6 +5,11 @@
 (function () {
   'use strict';
 
+  // Logged-in demo user: { username, role, label, displayName } or null.
+  // Set by the login code at the end of this file; render functions below
+  // check it so a role can never use an action it is not allowed.
+  var currentUser = null;
+
   // Footer year
   var yearEl = document.getElementById('year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
@@ -105,7 +110,9 @@
         '<p><strong>Year / Part:</strong> ' + escapeHtml(s.year) + '</p>' +
         '<p><strong>Student ID:</strong> ' + escapeHtml(s.id) + '</p>' +
         '<p class="muted">Demo data</p>' +
-        '<button class="btn btn-outline btn-small" type="button" data-delete="' + escapeHtml(s.id) + '">Remove (demo)</button>' +
+        (currentUser && currentUser.role === 'admin'
+          ? '<button class="btn btn-outline btn-small" type="button" data-delete="' + escapeHtml(s.id) + '">Remove (demo)</button>'
+          : '') +
         '</article>';
     });
     studentsGrid.innerHTML = html;
@@ -129,6 +136,7 @@
 
   if (studentsGrid) {
     studentsGrid.addEventListener('click', function (event) {
+      if (!currentUser || currentUser.role !== 'admin') return; // Admin only
       var btn = event.target && event.target.closest ? event.target.closest('[data-delete]') : null;
       if (!btn) return;
       var id = btn.getAttribute('data-delete');
@@ -143,6 +151,10 @@
   if (studentForm) {
     studentForm.addEventListener('submit', function (event) {
       event.preventDefault();
+      if (!currentUser || currentUser.role !== 'admin') {
+        if (studentNote) studentNote.textContent = 'Sirf Admin student add kar sakta hai — Teacher account view only hai.';
+        return;
+      }
       var name = document.getElementById('studentName').value.trim();
       var program = document.getElementById('studentProgram').value;
       var year = document.getElementById('studentYear').value;
@@ -162,6 +174,7 @@
   var resetBtn = document.getElementById('resetStudents');
   if (resetBtn) {
     resetBtn.addEventListener('click', function () {
+      if (!currentUser || currentUser.role !== 'admin') return; // Admin only
       students = SEED_STUDENTS.slice();
       saveStudents(students);
       renderStudents();
@@ -269,8 +282,10 @@
       row.querySelector('.student-program').textContent = currentProgram + ' · Demo data';
       row.dataset.student = name;
       var radios = row.querySelectorAll('input[type="radio"]');
+      var canMark = currentUser && (currentUser.role === 'admin' || currentUser.role === 'teacher');
       radios.forEach(function (r) {
         if (r.value === status) r.checked = true;
+        r.disabled = !canMark;
         r.addEventListener('change', updateSummary);
       });
       attList.appendChild(row);
@@ -300,6 +315,7 @@
   var saveBtn = document.getElementById('saveAttendance');
   if (saveBtn) {
     saveBtn.addEventListener('click', function () {
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
       if (!currentProgram || !currentDate) return;
       var all = loadAttendance();
       var record = {};
@@ -317,6 +333,7 @@
   var markPresentBtn = document.getElementById('markAllPresent');
   if (markPresentBtn) {
     markPresentBtn.addEventListener('click', function () {
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
       attList.querySelectorAll('.attendance-row').forEach(function (row) {
         var r = row.querySelector('input[value="present"]');
         if (r) r.checked = true;
@@ -327,6 +344,7 @@
   var markAbsentBtn = document.getElementById('markAllAbsent');
   if (markAbsentBtn) {
     markAbsentBtn.addEventListener('click', function () {
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
       attList.querySelectorAll('.attendance-row').forEach(function (row) {
         var r = row.querySelector('input[value="absent"]');
         if (r) r.checked = true;
@@ -337,6 +355,7 @@
   var clearBtn = document.getElementById('clearAttendance');
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
       if (!currentProgram || !currentDate) return;
       var all = loadAttendance();
       delete all[recordKey()];
@@ -439,12 +458,13 @@
       badge.textContent = f.status;
       actions.appendChild(amountEl);
       actions.appendChild(badge);
-      if (f.status === 'Pending') {
+      if (f.status === 'Pending' && currentUser && currentUser.role === 'admin') {
         var btn = document.createElement('button');
         btn.className = 'btn btn-primary';
         btn.type = 'button';
         btn.textContent = 'Mark as Paid';
         btn.addEventListener('click', function () {
+          if (!currentUser || currentUser.role !== 'admin') return; // Admin only
           f.status = 'Paid';
           saveFees(fees);
           renderFees();
@@ -466,6 +486,7 @@
     var resetFees = document.getElementById('resetFees');
     if (resetFees) {
       resetFees.addEventListener('click', function () {
+        if (!currentUser || currentUser.role !== 'admin') return; // Admin only
         fees = SEED_FEES.map(function (f) { return Object.assign({}, f); });
         saveFees(fees);
         if (feeProgram) feeProgram.value = '';
@@ -649,5 +670,226 @@
     resultProgram.addEventListener('change', renderResults);
     renderResults();
   }
+
+// ---- Login — 4 demo roles (no real accounts, no backend) ----
+  // Demo accounts are shown on the login page so anyone can try them.
+  // The username decides the role; the password is the same for all four.
+  var SESSION_KEY = 'ggdc-sms-session-v1';
+  var DEMO_USERS = {
+    admin:   { password: 'demo123', role: 'admin',   label: 'Admin',   displayName: 'Admin (Principal)' },
+    teacher: { password: 'demo123', role: 'teacher', label: 'Teacher', displayName: 'Teacher' },
+    student: { password: 'demo123', role: 'student', label: 'Student', displayName: 'Maryam (Student)' },
+    parent:  { password: 'demo123', role: 'parent',  label: 'Parent',  displayName: 'Parent of Maryam' }
+  };
+  // Demo student for the Student / Parent "My Record" view. Program and
+  // result come from the Phase 5 RESULTS table (ADS Science, Maryam 85.0%
+  // Grade A); the fee record comes from the Phase 4 fee records.
+  var MY_STUDENT_ID = 'GGDC-2026-004';
+  var MY_STUDENT_NAME = 'Maryam';
+  var MY_STUDENT_PROGRAM = 'ADS Science';
+
+  var loginForm = document.getElementById('loginForm');
+  var loginUser = document.getElementById('loginUser');
+  var loginPass = document.getElementById('loginPass');
+  var loginError = document.getElementById('loginError');
+  var logoutBtn = document.getElementById('logoutBtn');
+  var userArea = document.getElementById('userArea');
+  var userChip = document.getElementById('userChip');
+  var myRecord = document.getElementById('myRecord');
+  var myRecordNote = document.getElementById('myRecordNote');
+  var myRecordBody = document.getElementById('myRecordBody');
+  var studentsViewNote = document.getElementById('studentsViewNote');
+  var feesViewNote = document.getElementById('feesViewNote');
+
+  function renderMyRecord() {
+    if (!myRecordBody) return;
+    var ads = RESULTS[MY_STUDENT_PROGRAM];
+    var maryam = null;
+    if (ads) {
+      ads.students.forEach(function (s) { if (s.name === MY_STUDENT_NAME) maryam = s; });
+    }
+    var fee = null;
+    fees.forEach(function (f) { if (f.name === MY_STUDENT_NAME) fee = f; });
+
+    // Attendance: count Maryam's saved marks across ADS Science records.
+    var att = loadAttendance();
+    var presentDays = 0, absentDays = 0;
+    Object.keys(att).forEach(function (key) {
+      if (key.indexOf(MY_STUDENT_PROGRAM + '|') !== 0) return;
+      var rec = att[key] || {};
+      if (rec[MY_STUDENT_NAME] === 'present') presentDays += 1;
+      else if (rec[MY_STUDENT_NAME] === 'absent') absentDays += 1;
+    });
+    var attDays = presentDays + absentDays;
+    var attPct = attDays ? Math.round(presentDays / attDays * 100) : null;
+
+    var html = '<div class="my-record-grid">';
+    html += '<article class="my-record-card"><h3>Student</h3>' +
+      '<p><strong>Name:</strong> ' + escapeHtml(MY_STUDENT_NAME) + '</p>' +
+      '<p><strong>Student ID:</strong> ' + escapeHtml(MY_STUDENT_ID) + '</p>' +
+      '<p><strong>Program:</strong> ' + escapeHtml(MY_STUDENT_PROGRAM) + ' — Part I</p>' +
+      '<p class="muted">Demo data</p></article>';
+
+    html += '<article class="my-record-card"><h3>Attendance</h3>';
+    if (attPct === null) {
+      html += '<p>No attendance record saved yet.</p>' +
+        '<p class="muted">Teacher ya Admin jab ADS Science ki attendance save karein ge to yahan dikhegi.</p>';
+    } else {
+      html += '<p><strong>' + attPct + '% present</strong> — ' + presentDays + ' of ' + attDays +
+        ' saved day' + (attDays === 1 ? '' : 's') + ' present, ' + absentDays + ' absent.</p>';
+    }
+    html += '<p class="muted">Demo data</p></article>';
+
+    html += '<article class="my-record-card"><h3>Fees</h3>';
+    if (fee) {
+      html += '<p><strong>' + formatPKR(fee.amount) + '</strong> per term</p>' +
+        '<p>Status: <strong>' + escapeHtml(fee.status) + '</strong></p>' +
+        '<p class="muted">Fee record #' + fee.id + ' — demo data (sample amount, not the real college fee)</p>';
+    } else {
+      html += '<p>No fee record found (demo).</p>';
+    }
+    html += '</article>';
+
+    html += '<article class="my-record-card"><h3>Result — ADS Science</h3>';
+    if (maryam && ads) {
+      var max = ads.subjects.length * 100;
+      var total = totalMarks(maryam.marks);
+      var pct = pctOf(total, max);
+      var grade = gradeFor(pct);
+      var sumPct = 0, passCount = 0;
+      ads.students.forEach(function (s) {
+        var p = pctOf(totalMarks(s.marks), max);
+        sumPct += p;
+        if (isPass(p)) passCount += 1;
+      });
+      var avg = ads.students.length ? sumPct / ads.students.length : 0;
+      html += '<p><strong>Total:</strong> ' + total + ' / ' + max + ' — <strong>' + pct.toFixed(1) +
+        '%</strong> — Grade <strong>' + grade + '</strong></p>';
+      html += '<div class="table-wrap"><table class="result-table"><thead><tr>';
+      ads.subjects.forEach(function (sub) { html += '<th>' + escapeHtml(sub) + '</th>'; });
+      html += '</tr></thead><tbody><tr>';
+      maryam.marks.forEach(function (m) { html += '<td>' + m + '</td>'; });
+      html += '</tr></tbody></table></div>';
+      html += '<p class="muted">Class average ' + avg.toFixed(1) + '%, ' + passCount + ' of ' +
+        ads.students.length + ' passed — demo data.</p>';
+    } else {
+      html += '<p>No result found (demo).</p>';
+    }
+    html += '</article></div>';
+    myRecordBody.innerHTML = html;
+  }
+
+  function applyRole() {
+    var role = currentUser ? currentUser.role : null;
+    var isAdmin = role === 'admin';
+    var isTeacher = role === 'teacher';
+    var isStudentParent = role === 'student' || role === 'parent';
+    var canMark = isAdmin || isTeacher;
+
+    document.body.classList.toggle('logged-out', !currentUser);
+    if (userArea) userArea.hidden = !currentUser;
+    if (userChip && currentUser) userChip.textContent = currentUser.displayName + ' · ' + currentUser.label;
+
+    // Student / Parent see only My Record — the data sections are hidden.
+    var dataSections = ['students', 'attendance', 'fees', 'results'];
+    dataSections.forEach(function (id) {
+      var sec = document.getElementById(id);
+      if (sec) sec.hidden = isStudentParent;
+    });
+    if (myRecord) myRecord.hidden = !isStudentParent;
+
+    if (navLinks) {
+      var links = navLinks.querySelectorAll('a');
+      links.forEach(function (a) {
+        var target = (a.getAttribute('href') || '').replace('#', '');
+        var li = a.parentElement;
+        if (li) li.hidden = isStudentParent && dataSections.indexOf(target) !== -1;
+      });
+    }
+
+    // Students section: add form + reset are Admin only; Teacher gets a note.
+    if (studentForm) studentForm.hidden = !isAdmin;
+    if (resetBtn) resetBtn.hidden = !isAdmin;
+    if (studentsViewNote) studentsViewNote.hidden = !isTeacher;
+    // Fees section: reset is Admin only; Teacher gets a note.
+    var resetFeesBtn = document.getElementById('resetFees');
+    if (resetFeesBtn) resetFeesBtn.hidden = !isAdmin;
+    if (feesViewNote) feesViewNote.hidden = !isTeacher;
+    // Attendance edit buttons are Admin / Teacher only.
+    ['markAllPresent', 'markAllAbsent', 'clearAttendance', 'saveAttendance'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.hidden = !canMark;
+    });
+
+    if (myRecordNote) {
+      if (role === 'student') myRecordNote.textContent = 'View only — Student account: aap sirf apna record dekh sakti hain, kuch change nahi kar sakti.';
+      else if (role === 'parent') myRecordNote.textContent = 'View only — Parent account: aap sirf apni beti ka record dekh sakte hain, kuch change nahi kar sakte.';
+      else myRecordNote.textContent = '';
+    }
+
+    if (isStudentParent) renderMyRecord();
+    renderStudents();
+    renderFees();
+    renderResults();
+  }
+
+  function showLoginError(msg) {
+    if (loginError) {
+      loginError.textContent = msg;
+      loginError.hidden = false;
+    }
+  }
+
+  function doLogin(username, password) {
+    var key = String(username || '').trim().toLowerCase();
+    var user = DEMO_USERS[key];
+    if (!user || password !== user.password) {
+      showLoginError('Galat username ya password hai — demo account likhain: admin, teacher, student ya parent, password demo123. Dobara try karein.');
+      return false;
+    }
+    currentUser = { username: key, role: user.role, label: user.label, displayName: user.displayName };
+    try { window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentUser)); } catch (e) { /* session storage unavailable */ }
+    if (loginError) loginError.hidden = true;
+    if (loginForm) loginForm.reset();
+    applyRole();
+    return true;
+  }
+
+  function doLogout() {
+    currentUser = null;
+    try { window.sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
+    applyRole();
+    if (loginUser) loginUser.value = '';
+    if (loginPass) loginPass.value = '';
+    if (loginUser) loginUser.focus();
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      doLogin(loginUser.value, loginPass.value);
+    });
+  }
+  document.querySelectorAll('.login-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var u = btn.getAttribute('data-user');
+      if (loginUser) loginUser.value = u;
+      if (loginPass) loginPass.value = 'demo123';
+      doLogin(u, 'demo123');
+    });
+  });
+  if (logoutBtn) logoutBtn.addEventListener('click', doLogout);
+
+  // Restore the session after a refresh (sessionStorage, demo only).
+  try {
+    var savedSession = window.sessionStorage.getItem(SESSION_KEY);
+    if (savedSession) {
+      var parsedSession = JSON.parse(savedSession);
+      if (parsedSession && DEMO_USERS[parsedSession.username] && DEMO_USERS[parsedSession.username].role === parsedSession.role) {
+        currentUser = parsedSession;
+      }
+    }
+  } catch (e) { /* ignore — start logged out */ }
+  applyRole();
 
 })();

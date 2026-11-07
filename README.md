@@ -11,6 +11,22 @@ A College Management System for Government Girls Degree College, Sukkur, Sindh, 
 
 > **Demo Project / Built by Tasleem Bibi.** Demo project for Government Girls Degree College, Sukkur — not the college's official site. Program names and subjects are the college's real programs (Intermediate FSc/FA under BISE Sukkur; ADS Science under SALU; BS Computer Science, BSc Science, B.Com). All student numbers, student names, attendance, fees and marks are sample demo data only, and in-charges are labelled "In-charge (demo)" — no invented teacher names are presented as real college staff. No principal name, phone number, email address, or street address is used anywhere in this project. Tasleem studied ADS Science at this college; her marks and seat number are NOT in this app.
 
+## Login — 4 demo roles
+
+The app opens with a login page. **Demo login only — no real accounts, no backend, no passwords are sent anywhere.** The login session is kept in the browser's sessionStorage, so a refresh keeps you logged in; Logout ends it.
+
+| Demo account | Password | Role | What it can do |
+|---|---|---|---|
+| `admin` | `demo123` | Admin (Principal / College Admin) | Full access — add/remove students, mark attendance, mark fees Paid, view results, all programs |
+| `teacher` | `demo123` | Teacher | Mark + save attendance, view results and students (view only — cannot add/remove students or change fees) |
+| `student` | `demo123` | Student | View only — only her own record (demo student Maryam, GGDC-2026-004, ADS Science): attendance, fee record, result |
+| `parent` | `demo123` | Parent | View only — only their daughter's record (same demo student Maryam): attendance, fees, results |
+
+- The login page shows all four demo accounts as quick-pick buttons — tap one to log in straight away.
+- After login the header shows the logged-in name and role, with a Logout button.
+- Permissions are enforced in the page itself: roles that cannot use an action do not see its buttons or forms (e.g. Student/Parent never see the Students, Attendance, Fees or Results sections — only a "My Record" view; Teacher sees the Students and Fees sections but without the Add form, Remove buttons or Mark as Paid buttons, with a "View only" note).
+- A wrong username or password shows an error message in Roman Urdu/English and keeps you on the login page.
+
 ## Phase 1 — Done
 
 - College landing page: hero, About, Programs, Contact sections
@@ -75,7 +91,7 @@ python3 -m http.server 8000
 |---|---|
 | `index.html` | Landing page, About, Programs, Students, Attendance, Fees, Results, Contact |
 | `style.css` | All styling — dark blue / teal, responsive (attendance rows, fees cards, results table, grade badges) |
-| `script.js` | Mobile menu, program search, student records, attendance, fees record, result report, demo form, footer year |
+| `script.js` | Mobile menu, program search, student records, attendance, fees record, result report, demo form, footer year, demo login with 4 roles + permissions, My Record view |
 | `README.md` | This file |
 
 ## Notes

@@ -7,7 +7,7 @@
   <title>Government Girls Degree College, Sukkur | School Management System — All 5 Phases</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="logged-out">
   <header class="header">
     <nav class="nav container">
       <a href="#home" class="logo"><span class="logo-mark">TB</span> College Management System</a>
@@ -22,8 +22,38 @@
         <li><a href="#results">Results</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
+      <div class="user-area" id="userArea" hidden>
+        <span class="user-chip" id="userChip"></span>
+        <button class="btn btn-outline btn-small" id="logoutBtn" type="button">Logout</button>
+      </div>
     </nav>
   </header>
+
+  <!-- LOGIN — shown first, before the app -->
+  <section id="loginScreen" aria-label="Login">
+    <div class="login-card">
+      <p class="logo-mark login-mark">TB</p>
+      <h1>Government Girls Degree College, Sukkur</h1>
+      <p class="motto">School Management System</p>
+      <p class="demo-badge">Demo login — no real accounts</p>
+      <p class="muted">Apna demo account chunein ya username aur password likhein. Ye sirf demo ke liye hai — koi real account nahi hai, aur kuch bhi kahin send nahi hota.</p>
+      <form id="loginForm" class="login-form">
+        <label for="loginUser">Username</label>
+        <input type="text" id="loginUser" placeholder="e.g. admin" required autocomplete="username">
+        <label for="loginPass">Password</label>
+        <input type="password" id="loginPass" placeholder="demo123" required autocomplete="current-password">
+        <button class="btn btn-primary" type="submit">Login (demo)</button>
+        <p class="login-error" id="loginError" role="alert" hidden></p>
+      </form>
+      <p class="muted login-accounts-title">Demo accounts — kisi ek par tap karein:</p>
+      <div class="login-accounts">
+        <button type="button" class="login-pick" data-user="admin"><strong>&#128100; Admin</strong><span>Principal / College Admin — full access</span><span class="muted">admin / demo123</span></button>
+        <button type="button" class="login-pick" data-user="teacher"><strong>&#128214; Teacher</strong><span>Attendance + Results — students view only</span><span class="muted">teacher / demo123</span></button>
+        <button type="button" class="login-pick" data-user="student"><strong>&#127891; Student</strong><span>Apna record dekhain — view only</span><span class="muted">student / demo123</span></button>
+        <button type="button" class="login-pick" data-user="parent"><strong>&#128106; Parent</strong><span>Apni beti ka record dekhain — view only</span><span class="muted">parent / demo123</span></button>
+      </div>
+    </div>
+  </section>
 
   <main>
     <!-- HERO -->
@@ -39,7 +69,7 @@
           <a class="btn btn-outline" href="#students">Student Records</a>
           <a class="btn btn-outline" href="#results">Result Report</a>
         </div>
-        <p class="hero-note">All 5 phases complete &middot; HTML, CSS &amp; JavaScript only &middot; No sign-in needed</p>
+        <p class="hero-note">All 5 phases complete &middot; HTML, CSS &amp; JavaScript only &middot; Demo login — try admin / teacher / student / parent, password demo123</p>
       </div>
       <div class="hero-card">
         <p class="hero-card-big">&#127891;</p>
@@ -47,6 +77,14 @@
         <p><strong id="heroStudents">419</strong> students &middot; <strong>6</strong> programs</p>
         <p class="muted">Demo data — student numbers on this page are sample data for demonstration only.</p>
       </div>
+    </section>
+
+    <!-- MY RECORD — Student / Parent view only -->
+    <section id="myRecord" class="section container" hidden>
+      <h2>My Record — Maryam (Demo)</h2>
+      <p class="muted" id="myRecordNote"></p>
+      <div id="myRecordBody"></div>
+      <p class="muted">Demo data — ye record sample demo data hai, koi real student ka record nahi.</p>
     </section>
 
     <!-- ABOUT -->
@@ -147,6 +185,7 @@
     <section id="students" class="section container">
       <h2>Students</h2>
       <p class="muted">Student records — add a student and search students by name or program. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <p class="view-only-note" id="studentsViewNote" hidden>View only — Teacher account: students dekh sakte hain, add ya remove nahi kar sakte. Sirf Admin add ya remove kar sakta hai.</p>
       <form id="studentForm" class="contact-form">
         <label for="studentName">Student name</label>
         <input type="text" id="studentName" placeholder="e.g. Amina" required maxlength="60" autocomplete="off">
@@ -236,6 +275,7 @@
     <section id="fees" class="section container">
       <h2>Fees Record</h2>
       <p class="muted">Fees record — choose a program to see its students' fee status, and mark a fee as Paid. Fee amounts are sample demo amounts only (per term, in PKR) — not the college's real fees. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <p class="view-only-note" id="feesViewNote" hidden>View only — Teacher account: fees dekh sakte hain, Paid mark nahi kar sakte. Sirf Admin fees change kar sakta hai.</p>
       <div class="summary-grid" id="feesSummary">
         <article class="summary-card summary-collected">
           <p class="summary-label">Total collected</p>
