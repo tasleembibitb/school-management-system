@@ -270,7 +270,9 @@
   function nextStudentId() {
     var max = 0;
     students.forEach(function (s) {
-      var n = parseInt(String(s.id).replace(/\D/g, ''), 10);
+      // Only the trailing number counts: "GGDC-2026-009" -> 9, not 2026009.
+      var m = String(s.id).match(/(\d+)$/);
+      var n = m ? parseInt(m[1], 10) : NaN;
       if (!isNaN(n) && n > max) max = n;
     });
     var next = max + 1;
@@ -278,16 +280,13 @@
     return 'GGDC-2026-' + String(next).padStart(3, '0');
   }
 
-  // Hero counts are computed from the demo roster, never hardcoded (m2/m3).
+  // Hero counts are computed from the data, never hardcoded (m2/m3):
+  // students from the demo roster, programmes from the programme catalogue.
   function updateHeroCounts() {
     var hs = document.getElementById('heroStudents');
     if (hs) hs.textContent = students.length;
     var hp = document.getElementById('heroPrograms');
-    if (hp) {
-      var seen = {};
-      students.forEach(function (st) { seen[st.program] = true; });
-      hp.textContent = Object.keys(seen).length;
-    }
+    if (hp) hp.textContent = Object.keys(PROGRAMME_IDS).length;
   }
 
   if (studentsGrid) renderStudents();
@@ -625,7 +624,8 @@
   // B.Com Rs. 2,000. Every record's programme, year/part and amount match
   // its student's programme (M1). Every record has a unique receipt
   // RCP-001..RCP-014, fee #n gets RCP-00n (M2).
-  // Seed totals: 7 Paid / 7 Pending, Rs. 24,000 collected / Rs. 24,000 pending.
+  // Seed totals: 7 Paid / 7 Pending, Rs. 24,000 collected / Rs. 26,000 pending
+  // (pending = 4000+3500+3500+5000+5000+3000+2000).
   var SEED_FEES = [
     { id: 1, name: 'Amina', studentId: 'GGDC-2026-001', program: 'FSc Pre-Medical', year: 'XI', amount: 4000, status: 'Paid', receiptId: 'RCP-001' },
     { id: 2, name: 'Fatima', studentId: 'GGDC-2026-002', program: 'FSc Pre-Medical', year: 'XII', amount: 4000, status: 'Pending', receiptId: 'RCP-002' },
@@ -808,13 +808,13 @@
           if (fn2) fn2.textContent = 'Sirf Admin demo fees reset kar sakta hai — aapka account view only hai.';
           return;
         }
-        showConfirm('Reset demo fees? Saare Paid marks wapas original seed par aa jayenge (Rs. 24,000 collected / Rs. 24,000 pending).').then(function (ok) {
+        showConfirm('Reset demo fees? Saare Paid marks wapas original seed par aa jayenge (Rs. 24,000 collected / Rs. 26,000 pending).').then(function (ok) {
           if (!ok) return;
           fees = SEED_FEES.map(enrichFee);
           saveFees(fees);
           fbSet(FB_ROOT + '/fees', fbArrayToObject(fees, function (f) { return f.id; })).then(function (synced) {
             var fn3 = document.getElementById('feeNote');
-            if (fn3) fn3.textContent = 'Demo fees reset — Rs. 24,000 collected / Rs. 24,000 pending. ' + syncNote(synced);
+            if (fn3) fn3.textContent = 'Demo fees reset — Rs. 24,000 collected / Rs. 26,000 pending. ' + syncNote(synced);
           });
           if (feeProgram) feeProgram.value = '';
           if (feeStatus) feeStatus.value = '';
