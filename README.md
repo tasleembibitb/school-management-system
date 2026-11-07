@@ -11,18 +11,20 @@ A College Management System for Government Girls Degree College, Sukkur, Sindh, 
 
 > **Demo Project / Built by Tasleem Bibi.** Demo project for Government Girls Degree College, Sukkur — not the college's official site. Program names and subjects are the college's real programs (Intermediate FSc/FA under BISE Sukkur; ADS Science under SALU; BS Computer Science, BSc Science, B.Com). All student numbers, student names, attendance, fees and marks are sample demo data only, and in-charges are labelled "In-charge (demo)" — no invented teacher names are presented as real college staff. No principal name, phone number, email address, or street address is used anywhere in this project. Tasleem studied ADS Science at this college; her marks and seat number are NOT in this app.
 
-## Login — 4 demo roles
+## Login — 5 demo roles
 
 The app opens with a login page. **Demo login only — no real accounts; the login itself is checked locally in the browser and no password is sent anywhere.** Student, attendance, fees and results data syncs in realtime with the mobile app through Firebase Realtime Database (shared data at `/ggdc-sms/`), with an offline copy kept in the browser. The login session is kept in the browser's sessionStorage, so a refresh keeps you logged in; Logout ends it.
 
 | Demo account | Password | Role | What it can do |
 |---|---|---|---|
-| `admin` | `demo123` | Admin (Principal / College Admin) | Full access — add/remove students, mark attendance, mark fees Paid, view results, all programs |
+| `principal` | `demo123` | Principal | View-only reports dashboard — KPI cards, fee collection bar and 4 charts (fees donut, students per program, attendance, results); no edit buttons anywhere |
+| `admin` | `demo123` | Admin | Full access — add/remove students, mark attendance, mark fees Paid, view results, all programs; also sees the Principal reports dashboard |
 | `teacher` | `demo123` | Teacher | Mark + save attendance, view results and students (view only — cannot add/remove students or change fees) |
 | `student` | `demo123` | Student | View only — only her own record (demo student Maryam, GGDC-2026-004, ADS Science): attendance, fee record, result |
 | `parent` | `demo123` | Parent | View only — only their daughter's record (same demo student Maryam): attendance, fees, results |
 
-- The login page shows all four demo accounts as quick-pick buttons — tap one to log in straight away.
+- The login page shows all five demo accounts as quick-pick buttons — tap one to log in straight away.
+- **Principal dashboard:** after logging in as `principal` (or `admin`), a visual Reports Dashboard appears at the top — 4 KPI cards (total students, attendance %, fees collected, results average), a fee-collection bar and 4 Chart.js graphs (fees donut, students per program, attendance, results). Principal is view-only: no add/edit/delete buttons anywhere. Colour scheme: indigo + emerald.
 - After login the header shows the logged-in name and role, with a Logout button.
 - Permissions are enforced in the page itself: roles that cannot use an action do not see its buttons or forms (e.g. Student/Parent never see the Students, Attendance, Fees or Results sections — only a "My Record" view; Teacher sees the Students and Fees sections but without the Add form, Remove buttons or Mark as Paid buttons, with a "View only" note).
 - A wrong username or password shows an error message in Roman Urdu/English and keeps you on the login page.
@@ -109,7 +111,7 @@ python3 -m http.server 8000
 |---|---|
 | `index.html` | Landing page, About, Programs, Students, Attendance, Fees, Results, Contact |
 | `style.css` | All styling — dark blue / teal, responsive (attendance rows, fees cards, results table, grade badges) |
-| `script.js` | Mobile menu, program search, student records, attendance, fees record, result report, demo form, footer year, demo login with 4 roles + permissions, My Record view |
+| `script.js` | Mobile menu, program search, student records, attendance, fees record, result report, demo form, footer year, demo login with 5 roles + permissions, Principal visual dashboard (Chart.js), My Record view |
 | `README.md` | This file |
 
 ## Notes

@@ -26,7 +26,29 @@
     appId: '1:1068130100899:web:b1cde8e2f15c4993150116'
   };
   var FB_ROOT = 'ggdc-sms';
-  var FB = { ready: false, db: null };
+  // FB.lastError holds the most recent Firebase write failure (null = none).
+  // Sync must only be claimed when a write actually succeeded (m8 / C1).
+  var FB = { ready: false, db: null, authAttempted: false, authOk: false, lastError: null };
+
+  // Attempt anonymous sign-in before any write (C1). Returns a promise of
+  // true/false. Safe to call repeatedly — it only tries once per page load.
+  function ensureAuth() {
+    if (FB.authOk) return Promise.resolve(true);
+    if (!window.firebase || !window.firebase.auth) return Promise.resolve(false);
+    if (FB.authAttempted) return Promise.resolve(FB.authOk);
+    FB.authAttempted = true;
+    try {
+      return window.firebase.auth().signInAnonymously().then(function () {
+        FB.authOk = true; return true;
+      }).catch(function (e) { FB.lastError = e; return false; });
+    } catch (e) { FB.lastError = e; return Promise.resolve(false); }
+  }
+  // Short user-facing sync note: only claim Firebase sync on real success.
+  function syncNote(ok) {
+    return ok
+      ? 'Synced to the mobile app too (Firebase, demo).'
+      : 'Saved in this browser only — Firebase sync did not succeed (offline or not signed in), so the mobile app may not see it yet.';
+  }
 
   // Display program name -> shared programmeId (same IDs as the mobile app).
   var PROGRAMME_IDS = {
@@ -46,17 +68,28 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // All three return a Promise<boolean>: true only when the write reached
+  // Firebase. Callers must use the result before claiming sync (m8).
+  function fbWrite(refCall) {
+    if (!FB.ready) return Promise.resolve(false);
+    return ensureAuth().then(function () {
+      try {
+        var r = refCall();
+        if (r && typeof r.then === 'function') {
+          return r.then(function () { return true; }).catch(function (e) { FB.lastError = e; return false; });
+        }
+        return true;
+      } catch (e) { FB.lastError = e; return false; }
+    });
+  }
   function fbSet(path, value) {
-    if (!FB.ready) return;
-    try { FB.db.ref(path).set(value); } catch (e) { /* offline — the local cache keeps the app working */ }
+    return fbWrite(function () { return FB.db.ref(path).set(value); });
   }
   function fbUpdate(path, value) {
-    if (!FB.ready) return;
-    try { FB.db.ref(path).update(value); } catch (e) { /* ignore */ }
+    return fbWrite(function () { return FB.db.ref(path).update(value); });
   }
   function fbRemove(path) {
-    if (!FB.ready) return;
-    try { FB.db.ref(path).remove(); } catch (e) { /* ignore */ }
+    return fbWrite(function () { return FB.db.ref(path).remove(); });
   }
   // RTDB turns objects with sequential numeric keys ("1".."14") into arrays
   // with a null at index 0 — normalise both shapes to a plain array.
@@ -70,6 +103,31 @@
     arr.forEach(function (item) { obj[keyFn(item)] = item; });
     return obj;
   }
+
+  // In-page confirm dialog (M3) — works everywhere, including WebViews
+  // where window.confirm returns false without showing anything.
+  // Returns a Promise<boolean>; resolves false on Cancel / dismiss.
+  var confirmDialog = document.getElementById('confirmDialog');
+  var confirmMessageEl = document.getElementById('confirmMessage');
+  var confirmYesBtn = document.getElementById('confirmYes');
+  var confirmNoBtn = document.getElementById('confirmNo');
+  var confirmResolve = null;
+  function showConfirm(message) {
+    return new Promise(function (resolve) {
+      if (!confirmDialog) { resolve(false); return; }
+      if (confirmMessageEl) confirmMessageEl.textContent = message;
+      confirmDialog.hidden = false;
+      confirmResolve = resolve;
+      if (confirmYesBtn) confirmYesBtn.focus();
+    });
+  }
+  function closeConfirm(result) {
+    if (confirmDialog) confirmDialog.hidden = true;
+    if (confirmResolve) { var r = confirmResolve; confirmResolve = null; r(result); }
+  }
+  if (confirmYesBtn) confirmYesBtn.addEventListener('click', function () { closeConfirm(true); });
+  if (confirmNoBtn) confirmNoBtn.addEventListener('click', function () { closeConfirm(false); });
+  if (confirmDialog) confirmDialog.addEventListener('click', function (e) { if (e.target === confirmDialog) closeConfirm(false); });
 
   // Footer year
   var yearEl = document.getElementById('year');
@@ -136,7 +194,7 @@
       program: program, programmeId: s.programmeId || PROGRAMME_IDS[program] || '',
       programmeName: program,
       year: s.year || s.yearPart || '', yearPart: s.yearPart || s.year || '',
-      enrollmentDate: s.enrollmentDate || '2026-11-08'
+      enrollmentDate: s.enrollmentDate || todayString()
     };
   }
 
@@ -204,6 +262,7 @@
         '</article>';
     });
     studentsGrid.innerHTML = html;
+    updateHeroCounts();
     if (studentCount) studentCount.textContent = 'Showing ' + shown + (shown === 1 ? ' student' : ' students');
     if (studentNoResults) studentNoResults.hidden = shown !== 0;
   }
@@ -215,23 +274,47 @@
       if (!isNaN(n) && n > max) max = n;
     });
     var next = max + 1;
-    return 'GGDC-2026-' + ('00' + next).slice(-3);
+    // padStart keeps numbers past 999 intact (1000 -> "1000", never "000").
+    return 'GGDC-2026-' + String(next).padStart(3, '0');
+  }
+
+  // Hero counts are computed from the demo roster, never hardcoded (m2/m3).
+  function updateHeroCounts() {
+    var hs = document.getElementById('heroStudents');
+    if (hs) hs.textContent = students.length;
+    var hp = document.getElementById('heroPrograms');
+    if (hp) {
+      var seen = {};
+      students.forEach(function (st) { seen[st.program] = true; });
+      hp.textContent = Object.keys(seen).length;
+    }
   }
 
   if (studentsGrid) renderStudents();
+  updateHeroCounts();
   if (studentSearch) studentSearch.addEventListener('input', renderStudents);
   if (studentFilter) studentFilter.addEventListener('change', renderStudents);
 
   if (studentsGrid) {
     studentsGrid.addEventListener('click', function (event) {
-      if (!currentUser || currentUser.role !== 'admin') return; // Admin only
       var btn = event.target && event.target.closest ? event.target.closest('[data-delete]') : null;
       if (!btn) return;
+      if (!currentUser || currentUser.role !== 'admin') {
+        if (studentNote) studentNote.textContent = 'Sirf Admin student remove kar sakta hai — aapka account view only hai.';
+        return;
+      }
       var id = btn.getAttribute('data-delete');
-      students = students.filter(function (s) { return s.id !== id; });
-      saveStudents(students);
-      fbRemove(FB_ROOT + '/students/' + id);
-      renderStudents();
+      var victim = null;
+      students.forEach(function (st) { if (st.id === id) victim = st; });
+      showConfirm('Remove ' + (victim ? victim.name + ' (' + victim.id + ')' : id) + '? Ye student record delete ho jayega.').then(function (ok) {
+        if (!ok) return;
+        students = students.filter(function (st) { return st.id !== id; });
+        saveStudents(students);
+        fbRemove(FB_ROOT + '/students/' + id).then(function (synced) {
+          if (studentNote) studentNote.textContent = 'Removed ' + (victim ? victim.name : id) + '. ' + syncNote(synced);
+        });
+        renderStudents();
+      });
     });
   }
 
@@ -251,12 +334,15 @@
         if (studentNote) studentNote.textContent = 'Please fill in the name, program and year / part.';
         return;
       }
+      var duplicateName = students.some(function (st) { return st.name.trim().toLowerCase() === name.toLowerCase(); });
       var student = enrichStudent({ id: nextStudentId(), name: name, program: program, year: year });
       students.push(student);
       saveStudents(students);
-      fbSet(FB_ROOT + '/students/' + student.id, student);
+      fbSet(FB_ROOT + '/students/' + student.id, student).then(function (ok) {
+        if (studentNote) studentNote.textContent = 'Added ' + name + ' (' + program + ', ' + year + ') — ID ' + student.id + '. ' + syncNote(ok) +
+          (duplicateName ? ' Warning: is naam ka ek student pehle se mojood hai — dono ka naam same hai, ID alag hai.' : '');
+      });
       renderStudents();
-      if (studentNote) studentNote.textContent = 'Added ' + name + ' (' + program + ', ' + year + ') — ID ' + student.id + '. Synced to the mobile app too (Firebase, demo).';
       studentForm.reset();
     });
   }
@@ -264,12 +350,19 @@
   var resetBtn = document.getElementById('resetStudents');
   if (resetBtn) {
     resetBtn.addEventListener('click', function () {
-      if (!currentUser || currentUser.role !== 'admin') return; // Admin only
-      students = SEED_STUDENTS.map(enrichStudent);
-      saveStudents(students);
-      fbSet(FB_ROOT + '/students', fbArrayToObject(students, function (s) { return s.id; }));
-      renderStudents();
-      if (studentNote) studentNote.textContent = 'Demo students reset to the original 9 sample students.';
+      if (!currentUser || currentUser.role !== 'admin') {
+        if (studentNote) studentNote.textContent = 'Sirf Admin demo students reset kar sakta hai — aapka account view only hai.';
+        return;
+      }
+      showConfirm('Reset demo students? Saare added students delete ho jayenge aur original 9 sample students wapas aa jayenge.').then(function (ok) {
+        if (!ok) return;
+        students = SEED_STUDENTS.map(enrichStudent);
+        saveStudents(students);
+        fbSet(FB_ROOT + '/students', fbArrayToObject(students, function (s) { return s.id; })).then(function (synced) {
+          if (studentNote) studentNote.textContent = 'Demo students reset to the original 9 sample students. ' + syncNote(synced);
+        });
+        renderStudents();
+      });
     });
   }
 
@@ -344,22 +437,42 @@
     return (attendanceData[pid] && attendanceData[pid][currentDate]) || null;
   }
 
-  function updateSummary() {
-    if (!attSummary || !attList) return;
-    var rows = attList.querySelectorAll('.attendance-row');
-    var total = rows.length;
-    var present = 0;
+  // Summary counts only what was actually marked (m4): unmarked students
+  // are "Not marked" — never counted as Present. The rate is Present out of
+  // marked students only; '—' when nobody is marked yet.
+  function attendanceCounts() {
+    var rows = attList ? attList.querySelectorAll('.attendance-row') : [];
+    var c = { total: rows.length, present: 0, absent: 0, notMarked: 0 };
     rows.forEach(function (row) {
       var checked = row.querySelector('input[type="radio"]:checked');
-      if (checked && checked.value === 'present') present += 1;
+      if (!checked || checked.value === 'not-marked') c.notMarked += 1;
+      else if (checked.value === 'present') c.present += 1;
+      else if (checked.value === 'absent') c.absent += 1;
     });
-    var absent = total - present;
-    var pct = total ? Math.round((present / total) * 100) : 0;
+    c.marked = c.present + c.absent;
+    c.rate = c.marked ? Math.round((c.present / c.marked) * 100) : null;
+    return c;
+  }
+  function updateSummary() {
+    if (!attSummary || !attList) return;
+    var c = attendanceCounts();
     attSummary.innerHTML =
-      '<div class="summary-box"><strong>' + total + '</strong><span>Total students</span></div>' +
-      '<div class="summary-box"><strong>' + present + '</strong><span>Present</span></div>' +
-      '<div class="summary-box"><strong>' + absent + '</strong><span>Absent</span></div>' +
-      '<div class="summary-box"><strong>' + pct + '%</strong><span>Present</span></div>';
+      '<div class="summary-box"><strong>' + c.total + '</strong><span>Enrolled</span></div>' +
+      '<div class="summary-box"><strong>' + c.present + '</strong><span>Present</span></div>' +
+      '<div class="summary-box"><strong>' + c.absent + '</strong><span>Absent</span></div>' +
+      '<div class="summary-box"><strong>' + c.notMarked + '</strong><span>Not marked</span></div>' +
+      '<div class="summary-box"><strong>' + (c.rate === null ? '—' : c.rate + '%') + '</strong><span>Present (of marked)</span></div>';
+  }
+  // Summary of a SAVED record object {studentId: true/false} — computed from
+  // the saved record itself, never recomputed from the current roster.
+  function savedRecordSummary(record, rosterSize) {
+    var present = 0, absent = 0;
+    Object.keys(record || {}).forEach(function (k) { if (record[k] === true) present += 1; else if (record[k] === false) absent += 1; });
+    var notMarked = Math.max(0, rosterSize - present - absent);
+    var marked = present + absent;
+    var rate = marked ? Math.round(present / marked * 100) : null;
+    return 'Saved record: ' + present + ' present, ' + absent + ' absent, ' + notMarked + ' not marked' +
+      (rate === null ? '.' : ' — ' + rate + '% present (of marked).');
   }
 
   function renderAttendance() {
@@ -375,7 +488,9 @@
       attList.appendChild(empty);
     }
     roster.forEach(function (st, i) {
-      var status = saved[st.id] === false ? 'absent' : 'present';
+      // Not-marked is the default: a student with no saved mark is neither
+      // Present nor Absent until the teacher marks them (m4).
+      var status = saved[st.id] === true ? 'present' : (saved[st.id] === false ? 'absent' : 'not-marked');
       var row = document.createElement('div');
       row.className = 'attendance-row';
       row.innerHTML =
@@ -384,6 +499,7 @@
         '<div class="attendance-choices">' +
         '<label><input type="radio" name="att-' + i + '" value="present"> Present</label>' +
         '<label><input type="radio" name="att-' + i + '" value="absent"> Absent</label>' +
+        '<label><input type="radio" name="att-' + i + '" value="not-marked"> Not marked</label>' +
         '</div>';
       row.querySelector('.student-name').textContent = st.name;
       row.querySelector('.student-program').textContent = currentProgram + ' · Demo data';
@@ -398,6 +514,13 @@
       attList.appendChild(row);
     });
     updateSummary();
+    // Save is disabled when the roster is empty — never write an empty {} record (m6).
+    if (saveBtn) saveBtn.disabled = roster.length === 0;
+    if (attSaved) {
+      var savedRec = attRecord();
+      if (savedRec) attSaved.textContent = savedRecordSummary(savedRec, roster.length);
+      else if (roster.length) attSaved.textContent = 'No saved record for this date yet — mark students, then save.';
+    }
   }
 
   if (attForm) {
@@ -405,15 +528,18 @@
       event.preventDefault();
       currentProgram = attProgram.value;
       currentDate = attDate.value;
-      if (!currentProgram || !currentDate) return;
+      // Empty date / program and future dates are rejected with a message,
+      // never silently ignored (m5).
+      if (!currentProgram) { if (attNote) attNote.textContent = 'Please choose a program first.'; return; }
+      if (!currentDate) { if (attNote) attNote.textContent = 'Please choose a date first.'; return; }
+      if (currentDate > todayString()) { if (attNote) attNote.textContent = 'Future date ki attendance nahi mark kar sakte — aaj ya pehle ki date chunein.'; return; }
       var exists = !!attRecord();
       if (attPanel) attPanel.hidden = false;
       renderAttendance();
-      if (attSaved) attSaved.textContent = '';
       if (attNote) {
         attNote.textContent = exists
           ? 'Saved record found for ' + currentProgram + ' on ' + currentDate + ' — loaded below. Change any mark and save again to update it.'
-          : 'Attendance list loaded for ' + currentProgram + ' on ' + currentDate + '. Everyone starts as Present — change any student to Absent, then save.';
+          : 'Attendance list loaded for ' + currentProgram + ' on ' + currentDate + '. Mark each student Present, Absent, or leave Not marked, then save.';
       }
     });
   }
@@ -421,27 +547,38 @@
   var saveBtn = document.getElementById('saveAttendance');
   if (saveBtn) {
     saveBtn.addEventListener('click', function () {
-      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
-      if (!currentProgram || !currentDate) return;
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) {
+        if (attSaved) attSaved.textContent = 'Sirf Admin ya Teacher attendance save kar sakte hain.';
+        return;
+      }
+      if (!currentProgram || !currentDate) { if (attSaved) attSaved.textContent = 'Pehle program aur date choose karke list load karein.'; return; }
       var pid = PROGRAMME_IDS[currentProgram] || '';
+      // Only marked students are written; Not-marked students are left out
+      // of the record entirely (m4). An empty roster never saves (m6).
       var record = {};
       attList.querySelectorAll('.attendance-row').forEach(function (row) {
         var checked = row.querySelector('input[type="radio"]:checked');
-        record[row.dataset.student] = !checked || checked.value === 'present';
+        if (checked && checked.value === 'present') record[row.dataset.student] = true;
+        else if (checked && checked.value === 'absent') record[row.dataset.student] = false;
       });
+      var rosterSize = attList.querySelectorAll('.attendance-row').length;
+      if (rosterSize === 0) { if (attSaved) attSaved.textContent = 'Is program mein koi student nahi hai — attendance save nahi ho sakti.'; return; }
+      if (Object.keys(record).length === 0) { if (attSaved) attSaved.textContent = 'Kuch mark nahi kiya — pehle kam az kam ek student ko Present ya Absent mark karein, phir save karein.'; return; }
       if (!attendanceData[pid]) attendanceData[pid] = {};
       attendanceData[pid][currentDate] = record;
       saveAttendance(attendanceData);
-      fbSet(FB_ROOT + '/attendance/' + pid + '/' + currentDate, record);
+      fbSet(FB_ROOT + '/attendance/' + pid + '/' + currentDate, record).then(function (ok) {
+        if (attSaved) attSaved.textContent = 'Attendance saved for ' + currentProgram + ' on ' + currentDate + '. ' +
+          savedRecordSummary(record, rosterSize) + ' ' + syncNote(ok);
+      });
       updateSummary();
-      if (attSaved) attSaved.textContent = 'Attendance saved for ' + currentProgram + ' on ' + currentDate + '. Demo only — synced to the mobile app too (Firebase).';
     });
   }
 
   var markPresentBtn = document.getElementById('markAllPresent');
   if (markPresentBtn) {
     markPresentBtn.addEventListener('click', function () {
-      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) { if (attSaved) attSaved.textContent = 'Sirf Admin ya Teacher attendance mark kar sakte hain.'; return; }
       attList.querySelectorAll('.attendance-row').forEach(function (row) {
         var r = row.querySelector('input[value="present"]');
         if (r) r.checked = true;
@@ -452,7 +589,7 @@
   var markAbsentBtn = document.getElementById('markAllAbsent');
   if (markAbsentBtn) {
     markAbsentBtn.addEventListener('click', function () {
-      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) { if (attSaved) attSaved.textContent = 'Sirf Admin ya Teacher attendance mark kar sakte hain.'; return; }
       attList.querySelectorAll('.attendance-row').forEach(function (row) {
         var r = row.querySelector('input[value="absent"]');
         if (r) r.checked = true;
@@ -463,34 +600,47 @@
   var clearBtn = document.getElementById('clearAttendance');
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
-      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) return; // Admin / Teacher only
-      if (!currentProgram || !currentDate) return;
-      var pid = PROGRAMME_IDS[currentProgram] || '';
-      if (attendanceData[pid]) delete attendanceData[pid][currentDate];
-      saveAttendance(attendanceData);
-      fbRemove(FB_ROOT + '/attendance/' + pid + '/' + currentDate);
-      renderAttendance();
-      if (attSaved) attSaved.textContent = 'Saved record cleared for ' + currentProgram + ' on ' + currentDate + '.';
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'teacher')) {
+        if (attSaved) attSaved.textContent = 'Sirf Admin ya Teacher saved attendance clear kar sakte hain.';
+        return;
+      }
+      if (!currentProgram || !currentDate) { if (attSaved) attSaved.textContent = 'Pehle program aur date choose karke list load karein.'; return; }
+      showConfirm('Clear the saved attendance record for ' + currentProgram + ' on ' + currentDate + '? Ye record delete ho jayega.').then(function (ok) {
+        if (!ok) return;
+        var pid = PROGRAMME_IDS[currentProgram] || '';
+        if (attendanceData[pid]) delete attendanceData[pid][currentDate];
+        saveAttendance(attendanceData);
+        fbRemove(FB_ROOT + '/attendance/' + pid + '/' + currentDate).then(function (synced) {
+          if (attSaved) attSaved.textContent = 'Saved record cleared for ' + currentProgram + ' on ' + currentDate + '. ' + syncNote(synced);
+        });
+        renderAttendance();
+      });
     });
   }
 
 // ---- Phase 4: Fees record (demo only, localStorage) ----
   var FEES_KEY = 'ggdc-fees-v1';
+  // Fee table (shared seed, must match the mobile app): FSc Rs. 4,000 /
+  // FA Rs. 2,500 / ADS Rs. 3,500 / BS CS Rs. 5,000 / BSc Rs. 3,000 /
+  // B.Com Rs. 2,000. Every record's programme, year/part and amount match
+  // its student's programme (M1). Every record has a unique receipt
+  // RCP-001..RCP-014, fee #n gets RCP-00n (M2).
+  // Seed totals: 7 Paid / 7 Pending, Rs. 24,000 collected / Rs. 24,000 pending.
   var SEED_FEES = [
-    { id: 1, name: 'Amina', studentId: 'GGDC-2026-001', program: 'FSc Pre-Medical', year: 'XI', amount: 4000, status: 'Paid', receiptId: 'RCP-001', updatedAt: '2026-11-08' },
-    { id: 2, name: 'Fatima', studentId: 'GGDC-2026-002', program: 'FSc Pre-Medical', year: 'XII', amount: 4000, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 3, name: 'Sana', studentId: 'GGDC-2026-005', program: 'FSc Pre-Engineering', year: 'XI', amount: 4000, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 4, name: 'Hina', studentId: 'GGDC-2026-006', program: 'FSc Pre-Engineering', year: 'XII', amount: 4000, status: 'Paid', receiptId: 'RCP-002', updatedAt: '2026-11-08' },
-    { id: 5, name: 'Maryam', studentId: 'GGDC-2026-004', program: 'FA Humanities', year: 'XI', amount: 2500, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 6, name: 'Zainab', studentId: 'GGDC-2026-003', program: 'FA Humanities', year: 'XII', amount: 2500, status: 'Paid', receiptId: 'RCP-003', updatedAt: '2026-11-08' },
-    { id: 7, name: 'Iqra', studentId: null, program: 'ADS Science', year: 'Part I', amount: 3500, status: 'Paid', receiptId: 'RCP-004', updatedAt: '2026-11-08' },
-    { id: 8, name: 'Noor', studentId: 'GGDC-2026-007', program: 'ADS Science', year: 'Part II', amount: 3500, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 9, name: 'Ayesha', studentId: null, program: 'BS Computer Science', year: 'Year 2', amount: 5000, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 10, name: 'Rabia', studentId: null, program: 'BS Computer Science', year: 'Year 1', amount: 5000, status: 'Paid', receiptId: 'RCP-005', updatedAt: '2026-11-08' },
-    { id: 11, name: 'Sara', studentId: 'GGDC-2026-008', program: 'BSc Science', year: 'Year 1', amount: 3000, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 12, name: 'Mahnoor', studentId: 'GGDC-2026-009', program: 'BSc Science', year: 'Year 2', amount: 3000, status: 'Paid', receiptId: 'RCP-006', updatedAt: '2026-11-08' },
-    { id: 13, name: 'Kiran', studentId: null, program: 'B.Com Commerce', year: 'Year 1', amount: 2000, status: 'Pending', updatedAt: '2026-11-08' },
-    { id: 14, name: 'Saba', studentId: null, program: 'B.Com Commerce', year: 'Year 2', amount: 2000, status: 'Paid', receiptId: 'RCP-007', updatedAt: '2026-11-08' }
+    { id: 1, name: 'Amina', studentId: 'GGDC-2026-001', program: 'FSc Pre-Medical', year: 'XI', amount: 4000, status: 'Paid', receiptId: 'RCP-001' },
+    { id: 2, name: 'Fatima', studentId: 'GGDC-2026-002', program: 'FSc Pre-Medical', year: 'XII', amount: 4000, status: 'Pending', receiptId: 'RCP-002' },
+    { id: 3, name: 'Sana', studentId: 'GGDC-2026-005', program: 'ADS Science', year: 'Part I', amount: 3500, status: 'Pending', receiptId: 'RCP-003' },
+    { id: 4, name: 'Hina', studentId: 'GGDC-2026-006', program: 'ADS Science', year: 'Part II', amount: 3500, status: 'Paid', receiptId: 'RCP-004' },
+    { id: 5, name: 'Maryam', studentId: 'GGDC-2026-004', program: 'ADS Science', year: 'Part I', amount: 3500, status: 'Pending', receiptId: 'RCP-005' },
+    { id: 6, name: 'Zainab', studentId: 'GGDC-2026-003', program: 'FSc Pre-Engineering', year: 'XI', amount: 4000, status: 'Paid', receiptId: 'RCP-006' },
+    { id: 7, name: 'Iqra', studentId: null, program: 'ADS Science', year: 'Part I', amount: 3500, status: 'Paid', receiptId: 'RCP-007' },
+    { id: 8, name: 'Noor', studentId: 'GGDC-2026-007', program: 'BS Computer Science', year: 'Year 1', amount: 5000, status: 'Pending', receiptId: 'RCP-008' },
+    { id: 9, name: 'Ayesha', studentId: null, program: 'BS Computer Science', year: 'Year 2', amount: 5000, status: 'Pending', receiptId: 'RCP-009' },
+    { id: 10, name: 'Rabia', studentId: null, program: 'BS Computer Science', year: 'Year 1', amount: 5000, status: 'Paid', receiptId: 'RCP-010' },
+    { id: 11, name: 'Sara', studentId: 'GGDC-2026-008', program: 'BSc Science', year: 'Year 1', amount: 3000, status: 'Pending', receiptId: 'RCP-011' },
+    { id: 12, name: 'Mahnoor', studentId: 'GGDC-2026-009', program: 'B.Com Commerce', year: 'Year 1', amount: 2000, status: 'Paid', receiptId: 'RCP-012' },
+    { id: 13, name: 'Kiran', studentId: null, program: 'B.Com Commerce', year: 'Year 1', amount: 2000, status: 'Pending', receiptId: 'RCP-013' },
+    { id: 14, name: 'Saba', studentId: null, program: 'B.Com Commerce', year: 'Year 2', amount: 2000, status: 'Paid', receiptId: 'RCP-014' }
   ];
 
   // One fee object, used by both the local cache and Firebase:
@@ -505,7 +655,7 @@
       programmeName: program,
       year: f.year || f.yearPart || '', yearPart: f.yearPart || f.year || '',
       amount: f.amount, status: f.status,
-      receiptId: f.receiptId || null, updatedAt: f.updatedAt || '2026-11-08'
+      receiptId: f.receiptId || null, updatedAt: f.updatedAt || todayString()
     };
   }
 
@@ -535,6 +685,18 @@
   }
   function formatPKR(n) { return 'Rs. ' + n.toLocaleString('en-US'); }
 
+  // Next unique receipt: 'RCP-' + (highest numeric receipt suffix among all
+  // current fees + 1). Never derived from the fee id, so marking a fee paid
+  // can never collide with an existing receipt (M2).
+  function nextReceiptId() {
+    var max = 0;
+    fees.forEach(function (f) {
+      var m = f.receiptId ? String(f.receiptId).match(/RCP-(\d+)/) : null;
+      if (m) { var n = parseInt(m[1], 10); if (!isNaN(n) && n > max) max = n; }
+    });
+    return 'RCP-' + String(max + 1).padStart(3, '0');
+  }
+
   var fees = loadFees();
   var feesList = document.getElementById('feesList');
   var feeProgram = document.getElementById('feeProgram');
@@ -546,11 +708,18 @@
     if (!feesList) return;
     var program = feeProgram ? feeProgram.value : '';
     var status = feeStatus ? feeStatus.value : '';
+    // Fees summary follows the programme/status filter (m13): it totals only
+    // the records actually shown, and the scope is labelled below it.
+    var visibleFees = fees.filter(function (f) {
+      return (!program || f.program === program) && (!status || f.status === status);
+    });
     var collected = 0, pending = 0, paidCount = 0, pendingCount = 0;
-    fees.forEach(function (f) {
+    visibleFees.forEach(function (f) {
       if (f.status === 'Paid') { collected += f.amount; paidCount += 1; }
       else { pending += f.amount; pendingCount += 1; }
     });
+    var scopeEl = document.getElementById('feesScopeLabel');
+    if (scopeEl) scopeEl.textContent = (program || 'All programmes') + (status ? ' · ' + status + ' only' : '') + ' · sample demo data';
     var collectedEl = document.getElementById('feesCollected');
     var pendingEl = document.getElementById('feesPending');
     var paidCountEl = document.getElementById('feesPaidCount');
@@ -560,7 +729,7 @@
     if (pendingEl) pendingEl.textContent = formatPKR(pending);
     if (paidCountEl) paidCountEl.textContent = paidCount + (paidCount === 1 ? ' paid' : ' paid');
     if (pendingCountEl) pendingCountEl.textContent = pendingCount + (pendingCount === 1 ? ' pending' : ' pending');
-    if (totalEl) totalEl.textContent = fees.length;
+    if (totalEl) totalEl.textContent = visibleFees.length;
 
     feesList.innerHTML = '';
     var shown = 0;
@@ -579,7 +748,7 @@
       progEl.textContent = f.program + ' — ' + f.year + ' (per term)';
       var demoEl = document.createElement('p');
       demoEl.className = 'muted';
-      demoEl.textContent = 'Demo data';
+      demoEl.textContent = (f.receiptId ? 'Receipt ' + f.receiptId + ' · ' : '') + 'Demo data';
       info.appendChild(nameEl);
       info.appendChild(progEl);
       info.appendChild(demoEl);
@@ -601,10 +770,14 @@
         btn.addEventListener('click', function () {
           if (!currentUser || currentUser.role !== 'admin') return; // Admin only
           f.status = 'Paid';
-          f.receiptId = f.receiptId || ('RCP-' + String(f.id).padStart(3, '0'));
+          // Unique receipt from the highest existing receipt number (M2).
+          f.receiptId = f.receiptId || nextReceiptId();
           f.updatedAt = todayString();
           saveFees(fees);
-          fbUpdate(FB_ROOT + '/fees/' + f.id, { status: 'Paid', receiptId: f.receiptId, updatedAt: f.updatedAt });
+          fbUpdate(FB_ROOT + '/fees/' + f.id, { status: 'Paid', receiptId: f.receiptId, updatedAt: f.updatedAt }).then(function (ok) {
+            var fn = document.getElementById('feeNote');
+            if (fn) fn.textContent = f.name + ' marked Paid — Receipt ' + f.receiptId + '. ' + syncNote(ok);
+          });
           renderFees();
         });
         actions.appendChild(btn);
@@ -613,8 +786,14 @@
       card.appendChild(actions);
       feesList.appendChild(card);
     });
+    var fRate = (collected + pending) ? Math.round(collected / (collected + pending) * 100) : 0;
+    var ffl2 = document.getElementById('feesCollectionFill');
+    if (ffl2) ffl2.style.width = fRate + '%';
+    var fcl2 = document.getElementById('feesCollectionLabel');
+    if (fcl2) fcl2.textContent = fRate + '% collected';
     if (feeCount) feeCount.textContent = 'Showing ' + shown + (shown === 1 ? ' fee record' : ' fee records');
     if (feeNoResults) feeNoResults.hidden = shown !== 0;
+    if (typeof renderDashboard === 'function' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'principal')) renderDashboard();
   }
 
   if (feesList) {
@@ -624,13 +803,23 @@
     var resetFees = document.getElementById('resetFees');
     if (resetFees) {
       resetFees.addEventListener('click', function () {
-        if (!currentUser || currentUser.role !== 'admin') return; // Admin only
-        fees = SEED_FEES.map(enrichFee);
-        saveFees(fees);
-        fbSet(FB_ROOT + '/fees', fbArrayToObject(fees, function (f) { return f.id; }));
-        if (feeProgram) feeProgram.value = '';
-        if (feeStatus) feeStatus.value = '';
-        renderFees();
+        if (!currentUser || currentUser.role !== 'admin') {
+          var fn2 = document.getElementById('feeNote');
+          if (fn2) fn2.textContent = 'Sirf Admin demo fees reset kar sakta hai — aapka account view only hai.';
+          return;
+        }
+        showConfirm('Reset demo fees? Saare Paid marks wapas original seed par aa jayenge (Rs. 24,000 collected / Rs. 24,000 pending).').then(function (ok) {
+          if (!ok) return;
+          fees = SEED_FEES.map(enrichFee);
+          saveFees(fees);
+          fbSet(FB_ROOT + '/fees', fbArrayToObject(fees, function (f) { return f.id; })).then(function (synced) {
+            var fn3 = document.getElementById('feeNote');
+            if (fn3) fn3.textContent = 'Demo fees reset — Rs. 24,000 collected / Rs. 24,000 pending. ' + syncNote(synced);
+          });
+          if (feeProgram) feeProgram.value = '';
+          if (feeStatus) feeStatus.value = '';
+          renderFees();
+        });
       });
     }
   }
@@ -639,73 +828,57 @@
   // Marks are out of 100 per subject (4 subjects per program, total out of 400).
   // All marks are SAMPLE DEMO DATA. ADS subjects are the real ADS subjects
   // (English, Bio-Chemistry, Zoology, Botany) but the marks are invented samples.
+  // Every row links to a real seed student (name + programme match);
+  // the 21 orphan rows that used synthetic IDs GGDC-2026-101..121 were
+  // dropped — no marks invented. Remaining rows per programme:
+  // FSc Pre-Medical 1 (Fatima), FSc Pre-Engineering 1 (Zainab),
+  // ADS Science 1 (Maryam); FA Humanities, BS CS, BSc Science and
+  // B.Com Commerce have 0 rows (no seed student of that programme has
+  // result marks in the demo). Averages are computed from these rows only:
+  // FSc Pre-Medical 85.3%, FSc Pre-Engineering 86.8%, ADS Science 85.0%.
   var RESULTS_SEED = {
     'FSc Pre-Medical': {
       subjects: ['Biology', 'Chemistry', 'Physics', 'English'],
       students: [
-        { name: 'Fatima', year: 'XII', marks: [88, 84, 79, 90] },
-        { name: 'Ayesha', year: 'XI', marks: [72, 68, 75, 70] },
-        { name: 'Hira', year: 'XII', marks: [55, 61, 58, 64] },
-        { name: 'Mahnoor', year: 'XI', marks: [38, 42, 35, 40] }
+        { studentId: 'GGDC-2026-002', name: 'Fatima', year: 'XII', marks: [88, 84, 79, 90] }
       ]
     },
     'FSc Pre-Engineering': {
       subjects: ['Mathematics', 'Chemistry', 'Physics', 'English'],
       students: [
-        { name: 'Zainab', year: 'XII', marks: [91, 86, 88, 82] },
-        { name: 'Saba', year: 'XI', marks: [76, 70, 72, 78] },
-        { name: 'Rabia', year: 'XII', marks: [64, 59, 66, 61] },
-        { name: 'Khadija', year: 'XI', marks: [48, 52, 45, 50] }
+        { studentId: 'GGDC-2026-003', name: 'Zainab', year: 'XI', marks: [91, 86, 88, 82] }
       ]
     },
     'FA Humanities': {
       subjects: ['Civics', 'Economics', 'Education', 'English'],
-      students: [
-        { name: 'Noor', year: 'XII', marks: [82, 79, 85, 88] },
-        { name: 'Iqra', year: 'XI', marks: [68, 71, 65, 72] },
-        { name: 'Saba', year: 'XII', marks: [58, 54, 60, 57] }
-      ]
+      students: []
     },
     'ADS Science': {
       subjects: ['English', 'Bio-Chemistry', 'Zoology', 'Botany'],
       students: [
-        { name: 'Amina', year: 'Part II', marks: [78, 82, 74, 80] },
-        { name: 'Maryam', year: 'Part I', marks: [85, 88, 81, 86] },
-        { name: 'Hira', year: 'Part II', marks: [62, 58, 65, 60] },
-        { name: 'Zara', year: 'Part I', marks: [44, 47, 41, 46] }
+        { studentId: 'GGDC-2026-004', name: 'Maryam', year: 'Part I', marks: [85, 88, 81, 86] }
       ]
     },
     'BS Computer Science': {
       subjects: ['Programming', 'Data Structures', 'Databases', 'Web Development'],
-      students: [
-        { name: 'Fatima', year: 'Year 2', marks: [90, 87, 84, 92] },
-        { name: 'Zainab', year: 'Year 1', marks: [73, 77, 70, 75] },
-        { name: 'Iqra', year: 'Year 3', marks: [60, 63, 58, 66] }
-      ]
+      students: []
     },
     'BSc Science': {
       subjects: ['Botany', 'Zoology', 'Chemistry', 'English'],
-      students: [
-        { name: 'Sana', year: 'Year 2', marks: [80, 76, 82, 78] },
-        { name: 'Hina', year: 'Year 1', marks: [66, 62, 69, 64] },
-        { name: 'Mahnoor', year: 'Year 2', marks: [42, 39, 45, 41] }
-      ]
+      students: []
     },
     'B.Com Commerce': {
       subjects: ['Accounting', 'Business Maths', 'Economics', 'English'],
-      students: [
-        { name: 'Noor', year: 'Year 1', marks: [84, 81, 78, 86] },
-        { name: 'Ayesha', year: 'Year 2', marks: [70, 67, 72, 69] },
-        { name: 'Rabia', year: 'Year 1', marks: [52, 48, 55, 50] }
-      ]
+      students: []
     }
   };
 
   function totalMarks(marks) {
     var t = 0;
-    for (var i = 0; i < marks.length; i++) t += marks[i];
+    for (var i = 0; i < marks.length; i++) { if (marks[i] != null) t += marks[i]; }
     return t;
   }
+  function presentMarks(marks) { return marks.filter(function (m) { return m != null; }); }
   function pctOf(total, max) { return total / max * 100; }
   function gradeFor(pct) {
     if (pct >= 85) return 'A';
@@ -736,12 +909,15 @@
         var marks = subjects.map(function (sub) {
           return (r.subjectMarks && r.subjectMarks[sub] != null) ? r.subjectMarks[sub] : null;
         });
-        return { name: r.studentName || '', year: r.yearPart || r.year || '', marks: marks };
+        // Rows with a missing subject mark are KEPT — the table shows a dash
+        // for the missing mark instead of silently dropping the row (m11).
+        return { studentId: r.studentId || sid, name: r.studentName || '', year: r.yearPart || r.year || '', marks: marks };
       });
-      list = list.filter(function (s) { return s.marks.every(function (m) { return m !== null; }); });
-      if (list.length) next[display] = { subjects: subjects, students: list };
+      next[display] = { subjects: subjects, students: list };
     });
     if (Object.keys(next).length) {
+      // Fill in any programme the shared store does not have yet from the seed.
+      Object.keys(RESULTS_SEED).forEach(function (prog) { if (!next[prog]) next[prog] = RESULTS_SEED[prog]; });
       RESULTS = next;
       renderResults();
       if (currentUser && (currentUser.role === 'student' || currentUser.role === 'parent')) renderMyRecord();
@@ -749,13 +925,13 @@
   }
 
   // Build the one-time seed payload for /ggdc-sms/ from the local seeds.
-  // Student IDs match by (name, programme); other result rows get a
-  // deterministic GGDC-2026-1xx ID, in table order.
+  // Every result row links to a real seed student (name + programme match);
+  // a row with no matching seed student is skipped, never given a
+  // synthetic ID.
   function buildSeedPayload() {
     var studentsObj = fbArrayToObject(SEED_STUDENTS.map(enrichStudent), function (s) { return s.id; });
     var feesObj = fbArrayToObject(SEED_FEES.map(enrichFee), function (f) { return f.id; });
     var resultsObj = {};
-    var synth = 100;
     Object.keys(RESULTS_SEED).forEach(function (program) {
       var pid = PROGRAMME_IDS[program];
       var data = RESULTS_SEED[program];
@@ -763,7 +939,8 @@
       data.students.forEach(function (s) {
         var match = null;
         SEED_STUDENTS.forEach(function (st) { if (st.name === s.name && st.program === program) match = st; });
-        var sid = match ? match.id : 'GGDC-2026-' + (++synth);
+        if (!match) return; // no seed student — drop, never invent an ID
+        var sid = s.studentId || match.id;
         var total = totalMarks(s.marks);
         var pct = pctOf(total, data.subjects.length * 100);
         var sm = {};
@@ -803,18 +980,27 @@
     });
     resultHead.appendChild(headRow);
 
-    // Table body + summary
+    // Table body + summary. A missing subject mark shows as a dash (m11);
+    // totals/%/grade are computed over the marks that exist, and a row with
+    // no marks at all is shown but left out of the class summary.
     resultBody.innerHTML = '';
     var sumPct = 0;
+    var counted = 0;
     var passCount = 0;
     var top = null;
     data.students.forEach(function (s) {
+      var present = presentMarks(s.marks);
+      var hasMarks = present.length > 0;
       var total = totalMarks(s.marks);
-      var pct = pctOf(total, max);
-      var grade = gradeFor(pct);
-      sumPct += pct;
-      if (isPass(pct)) passCount += 1;
-      if (!top || pct > top.pct) top = { name: s.name, pct: pct };
+      var maxPresent = present.length * 100;
+      var pct = hasMarks ? pctOf(total, maxPresent) : null;
+      var grade = hasMarks ? gradeFor(pct) : null;
+      if (hasMarks) {
+        sumPct += pct;
+        counted += 1;
+        if (isPass(pct)) passCount += 1;
+        if (!top || pct > top.pct) top = { name: s.name, pct: pct };
+      }
       var row = document.createElement('tr');
       var nameCell = document.createElement('td');
       nameCell.textContent = s.name;
@@ -824,33 +1010,38 @@
       row.appendChild(yearCell);
       s.marks.forEach(function (m) {
         var cell = document.createElement('td');
-        cell.textContent = m;
+        cell.textContent = (m == null ? '—' : m);
         row.appendChild(cell);
       });
       var totalCell = document.createElement('td');
-      totalCell.textContent = total + ' / ' + max;
+      totalCell.textContent = hasMarks ? total + ' / ' + maxPresent : '—';
       row.appendChild(totalCell);
       var pctCell = document.createElement('td');
-      pctCell.textContent = pct.toFixed(1) + '%';
+      pctCell.textContent = hasMarks ? pct.toFixed(1) + '%' : '—';
       row.appendChild(pctCell);
       var gradeCell = document.createElement('td');
-      var badge = document.createElement('span');
-      badge.className = 'grade grade-' + grade.toLowerCase();
-      badge.textContent = grade;
-      gradeCell.appendChild(badge);
+      if (grade) {
+        var badge = document.createElement('span');
+        badge.className = 'grade grade-' + grade.toLowerCase();
+        badge.textContent = grade;
+        gradeCell.appendChild(badge);
+      } else {
+        gradeCell.textContent = '—';
+      }
       row.appendChild(gradeCell);
       resultBody.appendChild(row);
     });
 
     var n = data.students.length;
-    var avg = n ? sumPct / n : 0;
-    if (resultCount) resultCount.textContent = 'Showing ' + n + (n === 1 ? ' student' : ' students') + ' — ' + program;
+    var avg = counted ? sumPct / counted : null;
+    if (resultCount) resultCount.textContent = 'Showing ' + n + (n === 1 ? ' student' : ' students') + ' — ' + program +
+      (n === 0 ? ' (no result rows for this programme in the demo)' : '');
     if (resultSummary) {
       resultSummary.innerHTML = '';
       var items = [
-        { label: 'Class average', value: avg.toFixed(1) + '%' },
+        { label: 'Class average', value: avg === null ? '—' : avg.toFixed(1) + '%' },
         { label: 'Top student', value: top ? top.name + ' (' + top.pct.toFixed(1) + '%)' : '—' },
-        { label: 'Pass', value: passCount + ' of ' + n + ' (' + (n ? Math.round(passCount / n * 100) : 0) + '%)' }
+        { label: 'Pass', value: counted ? passCount + ' of ' + counted + ' (' + Math.round(passCount / counted * 100) + '%)' : '—' }
       ];
       items.forEach(function (item) {
         var card = document.createElement('div');
@@ -873,22 +1064,128 @@
     renderResults();
   }
 
+
+// ---- Principal / Admin Dashboard — visual reports (Chart.js) ----
+// Numbers are computed live from the same records the Fees / Students /
+// Results pages use — no separate copy, so dashboard and pages agree.
+// College-wide SAMPLE totals shown on the programme cards and dashboard
+// charts (labelled as such on the page) — NOT the demo roster. The demo
+// roster itself has 9 students; the hero counts are computed from it (m2/m3).
+var PROGRAM_COUNTS = {
+  'FSc Pre-Medical': 96, 'FSc Pre-Engineering': 84, 'FA Humanities': 62,
+  'ADS Science': 74, 'BS Computer Science': 58, 'BSc Science': 45,
+  'B.Com Commerce': 41
+};
+var dashboardCharts = [];
+function destroyDashboardCharts() {
+  dashboardCharts.forEach(function (c) { try { c.destroy(); } catch (e) {} });
+  dashboardCharts = [];
+}
+function renderDashboard() {
+  var dash = document.getElementById('dashboard');
+  if (!dash || dash.hidden) return;
+  // KPI: students
+  var totalStudents = 0;
+  Object.keys(PROGRAM_COUNTS).forEach(function (p) { totalStudents += PROGRAM_COUNTS[p]; });
+  var kpiStudents = document.getElementById('kpiStudents');
+  if (kpiStudents) kpiStudents.textContent = totalStudents;
+  // KPI: fees
+  var collected = 0, pending = 0, paidCount = 0, pendingCount = 0;
+  fees.forEach(function (f) {
+    if (f.status === 'Paid') { collected += f.amount; paidCount += 1; }
+    else { pending += f.amount; pendingCount += 1; }
+  });
+  var kc = document.getElementById('kpiCollected');
+  if (kc) kc.textContent = formatPKR(collected);
+  var kcs = document.getElementById('kpiCollectedSub');
+  if (kcs) kcs.textContent = paidCount + ' paid · ' + fees.length + ' records';
+  var kp = document.getElementById('kpiPending');
+  if (kp) kp.textContent = formatPKR(pending);
+  var kps = document.getElementById('kpiPendingSub');
+  if (kps) kps.textContent = pendingCount + ' pending';
+  var rate = (collected + pending) ? Math.round(collected / (collected + pending) * 100) : 0;
+  var fill = document.getElementById('collectionFill');
+  if (fill) fill.style.width = rate + '%';
+  var rl = document.getElementById('collectionRateLabel');
+  if (rl) rl.textContent = rate + '% collected';
+  var cn = document.getElementById('collectionNote');
+  if (cn) cn.textContent = 'Collected ' + formatPKR(collected) + ' of ' + formatPKR(collected + pending) + ' total (demo amounts, per term).';
+  var ffl = document.getElementById('feesCollectionFill');
+  if (ffl) ffl.style.width = rate + '%';
+  var fcl = document.getElementById('feesCollectionLabel');
+  if (fcl) fcl.textContent = rate + '% collected';
+  // KPI: overall result average
+  var sumAvg = 0, progCount = 0;
+  Object.keys(RESULTS).forEach(function (prog) {
+    var d = RESULTS[prog];
+    if (!d || !d.students.length) return;
+    var max = d.subjects.length * 100, s = 0;
+    d.students.forEach(function (st) { s += pctOf(totalMarks(st.marks), max); });
+    sumAvg += s / d.students.length; progCount += 1;
+  });
+  var overall = progCount ? sumAvg / progCount : 0;
+  var kr = document.getElementById('kpiResult');
+  if (kr) kr.textContent = overall ? overall.toFixed(1) + '%' : '—';
+  var krs = document.getElementById('kpiResultSub');
+  if (krs) krs.textContent = 'Class average across ' + progCount + ' programs · demo marks';
+  // Charts — need Chart.js; if CDN blocked, KPIs + bars above still work
+  if (!window.Chart) return;
+  destroyDashboardCharts();
+  var labels = Object.keys(PROGRAM_COUNTS);
+  // 1. Fees donut
+  var c1 = document.getElementById('chartFeesDonut');
+  if (c1) dashboardCharts.push(new Chart(c1, { type: 'doughnut',
+    data: { labels: ['Collected', 'Pending'], datasets: [{ data: [collected, pending], backgroundColor: ['#10b981', '#f59e0b'], borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } }));
+  // 2. Students per program
+  var c2 = document.getElementById('chartStudents');
+  if (c2) dashboardCharts.push(new Chart(c2, { type: 'bar',
+    data: { labels: labels, datasets: [{ label: 'Students', data: labels.map(function (p) { return PROGRAM_COUNTS[p]; }), backgroundColor: '#4f46e5', borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } }));
+  // 3. Average % per program
+  var avgData = labels.map(function (prog) {
+    var d = RESULTS[prog];
+    if (!d || !d.students.length) return 0;
+    var max = d.subjects.length * 100, s = 0;
+    d.students.forEach(function (st) { s += pctOf(totalMarks(st.marks), max); });
+    return Math.round(s / d.students.length * 10) / 10;
+  });
+  var c3 = document.getElementById('chartResults');
+  if (c3) dashboardCharts.push(new Chart(c3, { type: 'bar',
+    data: { labels: labels, datasets: [{ label: 'Average %', data: avgData, backgroundColor: '#8b5cf6', borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } } }));
+  // 4. Fees per program — paid vs pending (stacked)
+  var paidBy = labels.map(function (prog) { var t = 0; fees.forEach(function (f) { if (f.program === prog && f.status === 'Paid') t += f.amount; }); return t; });
+  var pendBy = labels.map(function (prog) { var t = 0; fees.forEach(function (f) { if (f.program === prog && f.status !== 'Paid') t += f.amount; }); return t; });
+  var c4 = document.getElementById('chartFeesProgram');
+  if (c4) dashboardCharts.push(new Chart(c4, { type: 'bar',
+    data: { labels: labels, datasets: [
+      { label: 'Paid (Rs.)', data: paidBy, backgroundColor: '#10b981', borderRadius: 4 },
+      { label: 'Pending (Rs.)', data: pendBy, backgroundColor: '#f59e0b', borderRadius: 4 } ] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } } }));
+}
+
 // ---- Login — 4 demo roles (no real accounts, no backend) ----
   // Demo accounts are shown on the login page so anyone can try them.
   // The username decides the role; the password is the same for all four.
   var SESSION_KEY = 'ggdc-sms-session-v1';
   var DEMO_USERS = {
-    admin:   { password: 'demo123', role: 'admin',   label: 'Admin',   displayName: 'Admin (Principal)' },
+    principal: { password: 'demo123', role: 'principal', label: 'Principal', displayName: 'Principal (GGDC Sukkur)' },
+    admin:   { password: 'demo123', role: 'admin',   label: 'Admin',   displayName: 'Admin' },
     teacher: { password: 'demo123', role: 'teacher', label: 'Teacher', displayName: 'Teacher' },
     student: { password: 'demo123', role: 'student', label: 'Student', displayName: 'Maryam (Student)' },
     parent:  { password: 'demo123', role: 'parent',  label: 'Parent',  displayName: 'Parent of Maryam' }
   };
-  // Demo student for the Student / Parent "My Record" view. Program and
-  // result come from the Phase 5 RESULTS table (ADS Science, Maryam 85.0%
-  // Grade A); the fee record comes from the Phase 4 fee records.
+  // Demo student for the Student / Parent "My Record" view. Everything
+  // about her is read from her own student record by ID (m10) — never by
+  // first-name match, and her programme/year are never hardcoded.
   var MY_STUDENT_ID = 'GGDC-2026-004';
-  var MY_STUDENT_NAME = 'Maryam';
-  var MY_STUDENT_PROGRAM = 'ADS Science';
+  function myStudentRecord() {
+    var found = null;
+    students.forEach(function (st) { if (st.id === MY_STUDENT_ID) found = st; });
+    if (!found) SEED_STUDENTS.forEach(function (st) { if (st.id === MY_STUDENT_ID) found = enrichStudent(st); });
+    return found;
+  }
 
   var loginForm = document.getElementById('loginForm');
   var loginUser = document.getElementById('loginUser');
@@ -905,17 +1202,20 @@
 
   function renderMyRecord() {
     if (!myRecordBody) return;
-    var ads = RESULTS[MY_STUDENT_PROGRAM];
+    var me = myStudentRecord();
+    if (!me) { myRecordBody.innerHTML = '<p>No record found for the demo student (demo).</p>'; return; }
+    var progData = RESULTS[me.program];
     var maryam = null;
-    if (ads) {
-      ads.students.forEach(function (s) { if (s.name === MY_STUDENT_NAME) maryam = s; });
+    if (progData) {
+      progData.students.forEach(function (s) { if (s.studentId === MY_STUDENT_ID || (s.name === me.name && !s.studentId)) maryam = s; });
     }
+    // Fee by student ID, never by first-name match (m10).
     var fee = null;
-    fees.forEach(function (f) { if (f.name === MY_STUDENT_NAME) fee = f; });
+    fees.forEach(function (f) { if (f.studentId === MY_STUDENT_ID) fee = f; });
 
-    // Attendance: count Maryam's saved marks across ADS Science records.
+    // Attendance: count this student's saved marks across her programme's records.
     var att = loadAttendance();
-    var myPid = PROGRAMME_IDS[MY_STUDENT_PROGRAM] || '';
+    var myPid = me.programmeId || PROGRAMME_IDS[me.program] || '';
     var presentDays = 0, absentDays = 0;
     var myAtt = (att && att[myPid]) || {};
     Object.keys(myAtt).forEach(function (date) {
@@ -928,9 +1228,9 @@
 
     var html = '<div class="my-record-grid">';
     html += '<article class="my-record-card"><h3>Student</h3>' +
-      '<p><strong>Name:</strong> ' + escapeHtml(MY_STUDENT_NAME) + '</p>' +
-      '<p><strong>Student ID:</strong> ' + escapeHtml(MY_STUDENT_ID) + '</p>' +
-      '<p><strong>Program:</strong> ' + escapeHtml(MY_STUDENT_PROGRAM) + ' — Part I</p>' +
+      '<p><strong>Name:</strong> ' + escapeHtml(me.name) + '</p>' +
+      '<p><strong>Student ID:</strong> ' + escapeHtml(me.id) + '</p>' +
+      '<p><strong>Program:</strong> ' + escapeHtml(me.program) + ' — ' + escapeHtml(me.year) + '</p>' +
       '<p class="muted">Demo data</p></article>';
 
     html += '<article class="my-record-card"><h3>Attendance</h3>';
@@ -953,28 +1253,35 @@
     }
     html += '</article>';
 
-    html += '<article class="my-record-card"><h3>Result — ADS Science</h3>';
-    if (maryam && ads) {
-      var max = ads.subjects.length * 100;
+    html += '<article class="my-record-card"><h3>Result — ' + escapeHtml(me.program) + '</h3>';
+    if (maryam && progData) {
+      var present = presentMarks(maryam.marks);
+      var max = present.length * 100;
       var total = totalMarks(maryam.marks);
-      var pct = pctOf(total, max);
-      var grade = gradeFor(pct);
-      var sumPct = 0, passCount = 0;
-      ads.students.forEach(function (s) {
-        var p = pctOf(totalMarks(s.marks), max);
-        sumPct += p;
+      var pct = present.length ? pctOf(total, max) : null;
+      var grade = pct === null ? null : gradeFor(pct);
+      var sumPct = 0, counted = 0, passCount = 0;
+      progData.students.forEach(function (s) {
+        var pr = presentMarks(s.marks);
+        if (!pr.length) return;
+        var p = pctOf(totalMarks(s.marks), pr.length * 100);
+        sumPct += p; counted += 1;
         if (isPass(p)) passCount += 1;
       });
-      var avg = ads.students.length ? sumPct / ads.students.length : 0;
-      html += '<p><strong>Total:</strong> ' + total + ' / ' + max + ' — <strong>' + pct.toFixed(1) +
-        '%</strong> — Grade <strong>' + grade + '</strong></p>';
-      html += '<div class="table-wrap"><table class="result-table"><thead><tr>';
-      ads.subjects.forEach(function (sub) { html += '<th>' + escapeHtml(sub) + '</th>'; });
-      html += '</tr></thead><tbody><tr>';
-      maryam.marks.forEach(function (m) { html += '<td>' + m + '</td>'; });
-      html += '</tr></tbody></table></div>';
-      html += '<p class="muted">Class average ' + avg.toFixed(1) + '%, ' + passCount + ' of ' +
-        ads.students.length + ' passed — demo data.</p>';
+      var avg = counted ? sumPct / counted : null;
+      if (pct === null) {
+        html += '<p>No marks recorded yet (demo).</p>';
+      } else {
+        html += '<p><strong>Total:</strong> ' + total + ' / ' + max + ' — <strong>' + pct.toFixed(1) +
+          '%</strong> — Grade <strong>' + grade + '</strong></p>';
+        html += '<div class="table-wrap"><table class="result-table"><thead><tr>';
+        progData.subjects.forEach(function (sub) { html += '<th>' + escapeHtml(sub) + '</th>'; });
+        html += '</tr></thead><tbody><tr>';
+        maryam.marks.forEach(function (m) { html += '<td>' + (m == null ? '—' : m) + '</td>'; });
+        html += '</tr></tbody></table></div>';
+        html += '<p class="muted">Class average ' + (avg === null ? '—' : avg.toFixed(1) + '%') + ', ' + passCount + ' of ' +
+          counted + ' passed — demo data.</p>';
+      }
     } else {
       html += '<p>No result found (demo).</p>';
     }
@@ -982,47 +1289,105 @@
     myRecordBody.innerHTML = html;
   }
 
+  // Clear status messages that belong to a previous role/session, so a
+  // student/parent never sees the admin's stale messages (and vice versa).
+  function clearStatusMessages() {
+    [studentNote, attNote, attSaved].forEach(function (el) { if (el) el.textContent = ''; });
+    var fn = document.getElementById('feeNote');
+    if (fn) fn.textContent = '';
+    var en = document.getElementById('enquiryNote');
+    if (en) en.textContent = '';
+    if (loginError) loginError.hidden = true;
+  }
+
   function applyRole() {
     var role = currentUser ? currentUser.role : null;
     var isAdmin = role === 'admin';
+    var isPrincipal = role === 'principal';
     var isTeacher = role === 'teacher';
     var isStudentParent = role === 'student' || role === 'parent';
+    var loggedOut = !currentUser;
     var canMark = isAdmin || isTeacher;
+    var canSeeDashboard = isAdmin || isPrincipal;
 
-    document.body.classList.toggle('logged-out', !currentUser);
-    if (userArea) userArea.hidden = !currentUser;
+    clearStatusMessages();
+    document.body.classList.toggle('logged-out', loggedOut);
+    if (userArea) userArea.hidden = loggedOut;
     if (userChip && currentUser) userChip.textContent = currentUser.displayName + ' · ' + currentUser.label;
 
-    // Student / Parent see only My Record — the data sections are hidden.
+    // Login gating (C2) + Tasleem's rule: each section shows only its own
+    // relevant content. Logged out, the page is a public landing page —
+    // hero, programmes, About, Contact and the login card only. No data
+    // section (dashboard, students, attendance, fees, results, My Record)
+    // is visible until login.
+    var dashSec = document.getElementById('dashboard');
+    if (dashSec) dashSec.hidden = !canSeeDashboard;
     var dataSections = ['students', 'attendance', 'fees', 'results'];
     dataSections.forEach(function (id) {
       var sec = document.getElementById(id);
-      if (sec) sec.hidden = isStudentParent;
+      if (sec) sec.hidden = loggedOut || isStudentParent;
     });
     if (myRecord) myRecord.hidden = !isStudentParent;
+    // Public landing sections are always visible.
+    ['home', 'classes', 'about', 'contact'].forEach(function (id) {
+      var sec = document.getElementById(id);
+      if (sec) sec.hidden = false;
+    });
 
     if (navLinks) {
       var links = navLinks.querySelectorAll('a');
       links.forEach(function (a) {
         var target = (a.getAttribute('href') || '').replace('#', '');
         var li = a.parentElement;
-        if (li) li.hidden = isStudentParent && dataSections.indexOf(target) !== -1;
+        if (!li) return;
+        if (loggedOut) li.hidden = ['dashboard', 'students', 'attendance', 'fees', 'results'].indexOf(target) !== -1;
+        else if (target === 'dashboard') li.hidden = !canSeeDashboard;
+        else if (isStudentParent) li.hidden = dataSections.indexOf(target) !== -1;
+        else li.hidden = false;
       });
     }
 
-    // Students section: add form + reset are Admin only; Teacher gets a note.
+    // Hero buttons: "Student Records" / "Result Report" open data sections,
+    // so they are hidden for student/parent (who get My Record instead).
+    // Logged out they stay visible but scroll to the login card (see the
+    // click handler below) instead of being dead links.
+    var heroStudentsBtn = document.getElementById('heroStudentsBtn');
+    var heroResultsBtn = document.getElementById('heroResultsBtn');
+    if (heroStudentsBtn) heroStudentsBtn.hidden = isStudentParent;
+    if (heroResultsBtn) heroResultsBtn.hidden = isStudentParent;
+
+    // Students section: add form + reset are Admin only; Teacher/Principal
+    // get a view-only note instead of silent no-ops.
     if (studentForm) studentForm.hidden = !isAdmin;
     if (resetBtn) resetBtn.hidden = !isAdmin;
-    if (studentsViewNote) studentsViewNote.hidden = !isTeacher;
-    // Fees section: reset is Admin only; Teacher gets a note.
+    if (studentsViewNote) {
+      studentsViewNote.hidden = isAdmin;
+      studentsViewNote.textContent = isTeacher
+        ? 'View only — Teacher account: students dekh sakte hain, add ya remove nahi kar sakte. Sirf Admin add ya remove kar sakta hai.'
+        : 'View only — Principal account: students dekh sakte hain, add ya remove nahi kar sakte. Sirf Admin add ya remove kar sakta hai.';
+    }
+    // Fees section: reset is Admin only; Teacher/Principal get a note.
     var resetFeesBtn = document.getElementById('resetFees');
     if (resetFeesBtn) resetFeesBtn.hidden = !isAdmin;
-    if (feesViewNote) feesViewNote.hidden = !isTeacher;
+    if (feesViewNote) {
+      feesViewNote.hidden = isAdmin;
+      feesViewNote.textContent = isTeacher
+        ? 'View only — Teacher account: fees dekh sakte hain, Paid mark nahi kar sakte. Sirf Admin fees change kar sakta hai.'
+        : 'View only — Principal account: fees dekh sakte hain, Paid mark nahi kar sakte. Sirf Admin fees change kar sakta hai.';
+    }
     // Attendance edit buttons are Admin / Teacher only.
     ['markAllPresent', 'markAllAbsent', 'clearAttendance', 'saveAttendance'].forEach(function (id) {
       var b = document.getElementById(id);
       if (b) b.hidden = !canMark;
     });
+    // Principal: attendance form is view-only — hide the load form, keep the
+    // section visible so saved summaries can be read from the dashboard.
+    if (attForm) attForm.hidden = isPrincipal;
+    if (isPrincipal) {
+      var dn = document.getElementById('dashboardNote');
+      if (dn) dn.textContent = 'Principal dashboard — view only. Saare numbers neeche wale Fees, Students aur Results records se live bante hain. Fees Paid mark karna ya student add karna sirf Admin kar sakta hai.';
+    }
+    if (canSeeDashboard) renderDashboard();
 
     if (myRecordNote) {
       if (role === 'student') myRecordNote.textContent = 'View only — Student account: aap sirf apna record dekh sakti hain, kuch change nahi kar sakti.';
@@ -1034,7 +1399,24 @@
     renderStudents();
     renderFees();
     renderResults();
+    if (canSeeDashboard) renderDashboard();
   }
+
+  // Hero data buttons when logged out: go to the login card, never a dead link.
+  ['heroStudentsBtn', 'heroResultsBtn'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.addEventListener('click', function (event) {
+      if (!currentUser) {
+        event.preventDefault();
+        var ls = document.getElementById('loginScreen');
+        if (ls && ls.scrollIntoView) ls.scrollIntoView();
+        var hint = document.getElementById('loginHint');
+        if (hint) { hint.hidden = false; hint.textContent = 'Is section ko dekhne ke liye pehle demo login karein (admin / teacher / student / parent, password demo123).'; }
+        if (loginUser) loginUser.focus();
+      }
+    });
+  });
 
   function showLoginError(msg) {
     if (loginError) {
@@ -1047,7 +1429,7 @@
     var key = String(username || '').trim().toLowerCase();
     var user = DEMO_USERS[key];
     if (!user || password !== user.password) {
-      showLoginError('Galat username ya password hai — demo account likhain: admin, teacher, student ya parent, password demo123. Dobara try karein.');
+      showLoginError('Galat username ya password hai — demo account likhain: principal, admin, teacher, student ya parent, password demo123. Dobara try karein.');
       return false;
     }
     currentUser = { username: key, role: user.role, label: user.label, displayName: user.displayName };
@@ -1064,6 +1446,9 @@
     applyRole();
     if (loginUser) loginUser.value = '';
     if (loginPass) loginPass.value = '';
+    // Back to the top of the login page (stale messages are cleared in applyRole).
+    try { if (window.scrollTo) window.scrollTo(0, 0); } catch (e) { /* jsdom / no scroll */ }
+    try { document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch (e) { /* ignore */ }
     if (loginUser) loginUser.focus();
   }
 
@@ -1102,12 +1487,24 @@
       if (!window.firebase.apps.length) window.firebase.initializeApp(FIREBASE_CONFIG);
       FB.db = window.firebase.database();
       FB.ready = true;
-      try { window.firebase.auth().signInAnonymously().catch(function () { /* writes still work in test mode */ }); } catch (e) { /* ignore */ }
+      // Attempt anonymous sign-in up front (C1); writes re-attempt it via ensureAuth.
+      try {
+        window.firebase.auth().signInAnonymously().then(function () { FB.authOk = true; FB.authAttempted = true; }).catch(function (e) { FB.lastError = e; FB.authAttempted = true; });
+      } catch (e) { /* ignore */ }
       var rootRef = FB.db.ref(FB_ROOT);
       rootRef.once('value').then(function (snap) {
+        var seed = buildSeedPayload();
         if (!snap.exists()) {
-          try { rootRef.set(buildSeedPayload()); } catch (e) { /* ignore */ }
+          try { rootRef.set(seed); } catch (e) { /* ignore */ }
+          return;
         }
+        // Per-child repair (m12): if any child node is missing, seed/repair
+        // just that child instead of overwriting the whole shared root.
+        var val = snap.val() || {};
+        if (val.students == null) { try { rootRef.child('students').set(seed.students); } catch (e) { /* ignore */ } }
+        if (val.fees == null) { try { rootRef.child('fees').set(seed.fees); } catch (e) { /* ignore */ } }
+        if (val.results == null) { try { rootRef.child('results').set(seed.results); } catch (e) { /* ignore */ } }
+        if (val.attendance == null) { try { rootRef.child('attendance').set({}); } catch (e) { /* ignore */ } }
       }).catch(function () { /* offline — the cache keeps the app working */ });
       FB.db.ref(FB_ROOT + '/students').on('value', function (snap) { try { syncStudentsFromFirebase(snap.val()); } catch (e) { /* ignore */ } });
       FB.db.ref(FB_ROOT + '/attendance').on('value', function (snap) { try { syncAttendanceFromFirebase(snap.val()); } catch (e) { /* ignore */ } });

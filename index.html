@@ -13,6 +13,7 @@
       <a href="#home" class="logo"><span class="logo-mark">TB</span> College Management System</a>
       <button class="menu-btn" id="menuBtn" aria-label="Toggle menu" aria-expanded="false">&#9776;</button>
       <ul class="nav-links" id="navLinks">
+        <li><a href="#dashboard">Dashboard</a></li>
         <li><a href="#home">Home</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#classes">Programs</a></li>
@@ -47,7 +48,8 @@
       </form>
       <p class="muted login-accounts-title">Demo accounts — kisi ek par tap karein:</p>
       <div class="login-accounts">
-        <button type="button" class="login-pick" data-user="admin"><strong>&#128100; Admin</strong><span>Principal / College Admin — full access</span><span class="muted">admin / demo123</span></button>
+        <button type="button" class="login-pick" data-user="principal"><strong>&#127970; Principal</strong><span>Reports dashboard — graphs &amp; fees, view only</span><span class="muted">principal / demo123</span></button>
+        <button type="button" class="login-pick" data-user="admin"><strong>&#128100; Admin</strong><span>Full access — students &amp; fees manage karein</span><span class="muted">admin / demo123</span></button>
         <button type="button" class="login-pick" data-user="teacher"><strong>&#128214; Teacher</strong><span>Attendance + Results — students view only</span><span class="muted">teacher / demo123</span></button>
         <button type="button" class="login-pick" data-user="student"><strong>&#127891; Student</strong><span>Apna record dekhain — view only</span><span class="muted">student / demo123</span></button>
         <button type="button" class="login-pick" data-user="parent"><strong>&#128106; Parent</strong><span>Apni beti ka record dekhain — view only</span><span class="muted">parent / demo123</span></button>
@@ -56,6 +58,37 @@
   </section>
 
   <main>
+
+    <!-- PRINCIPAL / ADMIN DASHBOARD — visual reports only -->
+    <section id="dashboard" class="section container" hidden>
+      <p class="eyebrow">Principal Dashboard &middot; Visual Reports</p>
+      <h2>College at a glance</h2>
+      <p class="muted" id="dashboardNote">Ye dashboard sirf Principal aur Admin ko dikhta hai — saare numbers neeche wale Fees, Students aur Results records se live bante hain. Kuch edit nahi hota yahan se.</p>
+      <div class="kpi-grid" id="kpiGrid">
+        <article class="kpi-card kpi-indigo"><p class="kpi-label">Total Students</p><p class="kpi-value" id="kpiStudents">419</p><p class="muted">6 programs &middot; demo data</p></article>
+        <article class="kpi-card kpi-emerald"><p class="kpi-label">Fees Collected</p><p class="kpi-value" id="kpiCollected">Rs. 0</p><p class="muted" id="kpiCollectedSub">— paid</p></article>
+        <article class="kpi-card kpi-amber"><p class="kpi-label">Fees Pending</p><p class="kpi-value" id="kpiPending">Rs. 0</p><p class="muted" id="kpiPendingSub">— pending</p></article>
+        <article class="kpi-card kpi-violet"><p class="kpi-label">Overall Result</p><p class="kpi-value" id="kpiResult">—</p><p class="muted" id="kpiResultSub">Class average &middot; demo data</p></article>
+      </div>
+      <div class="collection-bar-wrap">
+        <div class="collection-bar-head"><strong>Fee collection rate</strong><span id="collectionRateLabel">0%</span></div>
+        <div class="collection-bar"><div class="collection-fill" id="collectionFill" style="width:0%"></div></div>
+        <p class="muted" id="collectionNote"></p>
+      </div>
+      <div class="charts-grid">
+        <article class="chart-card"><h3>Fees — Collected vs Pending</h3><p class="muted">Donut chart &middot; demo amounts</p><div class="chart-box"><canvas id="chartFeesDonut" aria-label="Fees collected versus pending chart"></canvas></div></article>
+        <article class="chart-card"><h3>Students per Program</h3><p class="muted">Bar chart &middot; demo numbers</p><div class="chart-box"><canvas id="chartStudents" aria-label="Students per program chart"></canvas></div></article>
+        <article class="chart-card"><h3>Average % per Program</h3><p class="muted">Bar chart &middot; Results se, demo marks</p><div class="chart-box"><canvas id="chartResults" aria-label="Average result per program chart"></canvas></div></article>
+        <article class="chart-card"><h3>Fees per Program — Paid vs Pending</h3><p class="muted">Stacked bar &middot; demo amounts (Rs.)</p><div class="chart-box"><canvas id="chartFeesProgram" aria-label="Fees per program chart"></canvas></div></article>
+      </div>
+      <div class="dashboard-links">
+        <a class="btn btn-primary" href="#fees">Fees Record dekhein</a>
+        <a class="btn btn-outline" href="#results">Results dekhein</a>
+        <a class="btn btn-outline" href="#students">Students dekhein</a>
+      </div>
+      <p class="muted">Principal account view-only hai — Fees Paid mark karna, student add/remove karna sirf Admin kar sakta hai.</p>
+    </section>
+
     <!-- HERO -->
     <section id="home" class="hero container">
       <div>
@@ -69,7 +102,7 @@
           <a class="btn btn-outline" href="#students">Student Records</a>
           <a class="btn btn-outline" href="#results">Result Report</a>
         </div>
-        <p class="hero-note">All 5 phases complete &middot; HTML, CSS &amp; JavaScript only &middot; Demo login — try admin / teacher / student / parent, password demo123</p>
+        <p class="hero-note">All 5 phases complete &middot; HTML, CSS &amp; JavaScript only &middot; Demo login — try principal / admin / teacher / student / parent, password demo123</p>
       </div>
       <div class="hero-card">
         <p class="hero-card-big">&#127891;</p>
@@ -293,6 +326,10 @@
           <p class="muted">Sample demo data</p>
         </article>
       </div>
+      <div class="collection-bar-wrap">
+        <div class="collection-bar-head"><strong>Collection rate</strong><span id="feesCollectionLabel">0%</span></div>
+        <div class="collection-bar"><div class="collection-fill" id="feesCollectionFill" style="width:0%"></div></div>
+      </div>
       <div class="search-row">
         <label for="feeProgram">Program</label>
         <select id="feeProgram">
@@ -387,6 +424,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
