@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="School Management System — Phase 1: landing page and programs list for Government Girls Degree College, Sukkur, Sindh, Pakistan. Demo project built by Tasleem Bibi.">
-  <title>Government Girls Degree College, Sukkur | School Management System — Phase 1</title>
+  <meta name="description" content="School Management System — all 5 phases complete for Government Girls Degree College, Sukkur, Sindh, Pakistan. Demo project built by Tasleem Bibi.">
+  <title>Government Girls Degree College, Sukkur | School Management System — All 5 Phases</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,6 +16,10 @@
         <li><a href="#home">Home</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#classes">Programs</a></li>
+        <li><a href="#students">Students</a></li>
+        <li><a href="#attendance">Attendance</a></li>
+        <li><a href="#fees">Fees</a></li>
+        <li><a href="#results">Results</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
     </nav>
@@ -29,12 +33,13 @@
         <h1>Government Girls Degree College, Sukkur</h1>
         <p class="motto">Discipline &middot; Dedication &middot; Excellence</p>
         <p class="demo-badge">Demo Project &middot; Built by Tasleem Bibi</p>
-        <p>A simple College Management System for Government Girls Degree College, Sukkur. Phase 1 shows the college landing page and the programs list — Intermediate (XI &amp; XII) and degree programs, with main subjects and student numbers (sample demo data).</p>
+        <p>A simple College Management System for Government Girls Degree College, Sukkur. All 5 phases are complete — programs list, student records, attendance, fees record and result report — for Intermediate XI &amp; XII and degree programs, with main subjects and student numbers as sample demo data.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#classes">View Programs</a>
-          <a class="btn btn-outline" href="#about">How it works</a>
+          <a class="btn btn-outline" href="#students">Student Records</a>
+          <a class="btn btn-outline" href="#results">Result Report</a>
         </div>
-        <p class="hero-note">Phase 1 of 5 &middot; HTML, CSS &amp; JavaScript only &middot; No sign-in needed</p>
+        <p class="hero-note">All 5 phases complete &middot; HTML, CSS &amp; JavaScript only &middot; No sign-in needed</p>
       </div>
       <div class="hero-card">
         <p class="hero-card-big">&#127891;</p>
@@ -54,20 +59,20 @@
           <p>Landing page and programs list (FSc, FA, ADS, BS, BSc). Responsive layout, mobile menu, program search.</p>
         </article>
         <article class="about-card">
-          <h3>&#128100; Phase 2 — Next</h3>
-          <p>Student records — add a student and search students by name or program.</p>
+          <h3>&#128100; Phase 2 — Done</h3>
+          <p>Student records — add a student and search students by name or program. Records are saved in the browser (localStorage, demo only).</p>
         </article>
         <article class="about-card">
-          <h3>&#9989; Phase 3 — Planned</h3>
-          <p>Attendance — mark students present or absent, day by day.</p>
+          <h3>&#9989; Phase 3 — Done</h3>
+          <p>Attendance — pick a program and a date, mark students present or absent, and see the day's summary. Saved in this browser only (demo).</p>
         </article>
         <article class="about-card">
-          <h3>&#128179; Phase 4 — Planned</h3>
-          <p>Fees record — track which fees are paid and which are pending.</p>
+          <h3>&#128179; Phase 4 — Done</h3>
+          <p>Fees record — see paid and pending fees, mark a fee as paid, and view the collection summary. Saved in this browser only (demo).</p>
         </article>
         <article class="about-card">
-          <h3>&#128202; Phase 5 — Planned</h3>
-          <p>Result report — marks and grades for each program.</p>
+          <h3>&#128202; Phase 5 — Done</h3>
+          <p>Result report — marks and grades for each program, with a class summary (average, top student, pass count).</p>
         </article>
         <article class="about-card">
           <h3>&#127891; Who built it</h3>
@@ -138,6 +143,169 @@
       <p class="muted" id="noResults" hidden>No program matches your search. Try “ADS Science” or “FSc”.</p>
     </section>
 
+    <!-- STUDENTS — PHASE 2 -->
+    <section id="students" class="section container">
+      <h2>Students</h2>
+      <p class="muted">Student records — add a student and search students by name or program. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <form id="studentForm" class="contact-form">
+        <label for="studentName">Student name</label>
+        <input type="text" id="studentName" placeholder="e.g. Amina" required maxlength="60" autocomplete="off">
+        <label for="studentProgram">Program</label>
+        <select id="studentProgram" required>
+          <option value="">Choose a program…</option>
+          <option>FSc Pre-Medical</option>
+          <option>FSc Pre-Engineering</option>
+          <option>FA Humanities</option>
+          <option>ADS Science</option>
+          <option>BS Computer Science</option>
+          <option>BSc Science</option>
+          <option>B.Com Commerce</option>
+        </select>
+        <label for="studentYear">Year / Part</label>
+        <select id="studentYear" required>
+          <option value="">Choose year / part…</option>
+          <option>XI</option>
+          <option>XII</option>
+          <option>Part I</option>
+          <option>Part II</option>
+          <option>Year 1</option>
+          <option>Year 2</option>
+          <option>Year 3</option>
+          <option>Year 4</option>
+        </select>
+        <button class="btn btn-primary" type="submit">Add student (demo)</button>
+        <p class="muted" id="studentNote" role="status"></p>
+      </form>
+      <div class="search-row">
+        <label for="studentSearch">Search students</label>
+        <input type="search" id="studentSearch" placeholder="Try: Amina, or ADS Science…" autocomplete="off">
+        <label for="studentFilter">Program</label>
+        <select id="studentFilter">
+          <option value="">All programs</option>
+          <option>FSc Pre-Medical</option>
+          <option>FSc Pre-Engineering</option>
+          <option>FA Humanities</option>
+          <option>ADS Science</option>
+          <option>BS Computer Science</option>
+          <option>BSc Science</option>
+          <option>B.Com Commerce</option>
+        </select>
+        <p class="muted" id="studentCount">Showing 9 students</p>
+      </div>
+      <div class="classes-grid" id="studentsGrid"></div>
+      <p class="muted" id="studentNoResults" hidden>No student matches your search. Try a name like “Amina” or a program like “ADS Science”.</p>
+      <button class="btn btn-outline" id="resetStudents" type="button">Reset demo students</button>
+      <p class="muted">Demo data — names are samples only. Added students stay in this browser until you reset them.</p>
+    </section>
+
+<!-- ATTENDANCE — PHASE 3 -->
+    <section id="attendance" class="section container">
+      <h2>Attendance</h2>
+      <p class="muted">Mark attendance — pick a program and a date, mark each student Present or Absent, then save. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <form id="attendanceForm" class="contact-form">
+        <label for="attendanceProgram">Program</label>
+        <select id="attendanceProgram" required>
+          <option value="">Choose a program…</option>
+          <option>FSc Pre-Medical</option>
+          <option>FSc Pre-Engineering</option>
+          <option>FA Humanities</option>
+          <option>ADS Science</option>
+          <option>BS Computer Science</option>
+          <option>BSc Science</option>
+          <option>B.Com Commerce</option>
+        </select>
+        <label for="attendanceDate">Date</label>
+        <input type="date" id="attendanceDate" required>
+        <button class="btn btn-primary" type="submit">Load attendance list</button>
+        <p class="muted" id="attendanceNote" role="status"></p>
+      </form>
+      <div id="attendancePanel" hidden>
+        <div class="search-row">
+          <button class="btn btn-outline" id="markAllPresent" type="button">Mark all present</button>
+          <button class="btn btn-outline" id="markAllAbsent" type="button">Mark all absent</button>
+          <button class="btn btn-outline" id="clearAttendance" type="button">Clear saved record</button>
+        </div>
+        <div id="attendanceSummary" class="attendance-summary" aria-live="polite"></div>
+        <div id="attendanceList" class="attendance-list"></div>
+        <button class="btn btn-primary" id="saveAttendance" type="button">Save attendance (demo)</button>
+        <p class="muted" id="attendanceSaved" role="status"></p>
+      </div>
+    </section>
+
+<!-- FEES — PHASE 4 -->
+    <section id="fees" class="section container">
+      <h2>Fees Record</h2>
+      <p class="muted">Fees record — choose a program to see its students' fee status, and mark a fee as Paid. Fee amounts are sample demo amounts only (per term, in PKR) — not the college's real fees. Records are saved in this browser only (localStorage, demo only) and nothing is sent anywhere. All students below are sample demo data — generic names only, no real college students.</p>
+      <div class="summary-grid" id="feesSummary">
+        <article class="summary-card summary-collected">
+          <p class="summary-label">Total collected</p>
+          <p class="summary-value" id="feesCollected">Rs. 0</p>
+          <p class="muted" id="feesPaidCount">0 paid</p>
+        </article>
+        <article class="summary-card summary-pending">
+          <p class="summary-label">Total pending</p>
+          <p class="summary-value" id="feesPending">Rs. 0</p>
+          <p class="muted" id="feesPendingCount">0 pending</p>
+        </article>
+        <article class="summary-card">
+          <p class="summary-label">Fee records shown</p>
+          <p class="summary-value" id="feesTotal">0</p>
+          <p class="muted">Sample demo data</p>
+        </article>
+      </div>
+      <div class="search-row">
+        <label for="feeProgram">Program</label>
+        <select id="feeProgram">
+          <option value="">All programs</option>
+          <option>FSc Pre-Medical</option>
+          <option>FSc Pre-Engineering</option>
+          <option>FA Humanities</option>
+          <option>ADS Science</option>
+          <option>BS Computer Science</option>
+          <option>BSc Science</option>
+          <option>B.Com Commerce</option>
+        </select>
+        <label for="feeStatus">Status</label>
+        <select id="feeStatus">
+          <option value="">Paid &amp; Pending</option>
+          <option value="Paid">Paid only</option>
+          <option value="Pending">Pending only</option>
+        </select>
+        <p class="muted" id="feeCount">Showing 0 fee records</p>
+      </div>
+      <div class="fees-list" id="feesList"></div>
+      <p class="muted" id="feeNoResults" hidden>No fee record matches. Try another program or status.</p>
+      <button class="btn btn-outline" id="resetFees" type="button">Reset demo fees</button>
+      <p class="muted">Demo data — fee amounts are samples only, not real college fees. Paid marks stay in this browser until you reset them.</p>
+    </section>
+
+<!-- RESULTS — PHASE 5 -->
+    <section id="results" class="section container">
+      <h2>Results</h2>
+      <p class="muted">Result report — choose a program to see sample demo students with marks and grades. Grades are calculated from the percentage: A (85%+), B (70–84%), C (60–69%), D (50–59%), E (40–49%), Fail (below 40%). Pass means 40% or more. All marks below are sample demo data — generic names only, no real college students or results.</p>
+      <div class="search-row">
+        <label for="resultProgram">Program</label>
+        <select id="resultProgram">
+          <option>FSc Pre-Medical</option>
+          <option>FSc Pre-Engineering</option>
+          <option>FA Humanities</option>
+          <option selected>ADS Science</option>
+          <option>BS Computer Science</option>
+          <option>BSc Science</option>
+          <option>B.Com Commerce</option>
+        </select>
+        <p class="muted" id="resultCount"></p>
+      </div>
+      <div class="results-summary" id="resultSummary"></div>
+      <div class="table-wrap">
+        <table class="result-table" id="resultTable">
+          <thead id="resultHead"></thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </div>
+      <p class="muted">Demo data — marks are samples only, for demonstration. Tasleem's own ADS marks and seat number are not used anywhere in this app.</p>
+    </section>
+
     <!-- CONTACT -->
     <section id="contact" class="section container">
       <h2>Contact</h2>
@@ -171,7 +339,7 @@
   <footer class="footer">
     <div class="container">
       <p><strong>Government Girls Degree College, Sukkur</strong> — demo project for this college, not the college's official site.</p>
-      <p>College Management System, Phase 1 &middot; Demo Project &middot; Built by Tasleem Bibi &middot; Sukkur, Sindh, Pakistan &middot; <span id="year"></span></p>
+      <p>College Management System, All 5 Phases &middot; Demo Project &middot; Built by Tasleem Bibi &middot; Sukkur, Sindh, Pakistan &middot; <span id="year"></span></p>
     </div>
   </footer>
 
