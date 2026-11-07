@@ -1,5 +1,7 @@
-/* School Management System — All 5 Phases
-   Colours match Tasleem Bibi's TB branding: dark blue + teal. */
+/* School Management System — All 5 Phases + Principal Dashboard
+   Colours: deep indigo + indigo primary, emerald = collected, amber = pending.
+   NOTE: [hidden] must beat .btn/.contact-form display rules, otherwise
+   JS-hidden buttons/forms (e.g. Add student for Principal) stay visible. */
 :root {
   /* New scheme — top school dashboards (Schola / EduBoard / PowerSchool pattern):
      Deep indigo header + indigo primary, emerald = collected/success,
@@ -26,6 +28,14 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
+html, body { overflow-x: hidden; }
+html { overflow-x: clip; }
+body { overflow-x: clip; }
+/* Headings clear the sticky navbar when jumped to (anchor links). */
+section[id], #loginScreen { scroll-margin-top: 76px; }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -48,7 +58,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   min-height: 60px;
+  position: relative;
 }
 .logo {
   color: #fff;
@@ -58,7 +70,13 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.logo .logo-mark { flex-shrink: 0; }
 .logo-mark {
   display: inline-flex;
   align-items: center;
@@ -244,8 +262,8 @@ h3 { margin: 0 0 6px; color: var(--navy); }
   h1 { font-size: 1.9rem; }
   .about-grid, .classes-grid { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 560px) {
-  .menu-btn { display: block; }
+@media (max-width: 1020px) {
+  .menu-btn { display: block; flex-shrink: 0; }
   .nav-links {
     display: none;
     position: absolute;
@@ -255,17 +273,21 @@ h3 { margin: 0 0 6px; color: var(--navy); }
     background: var(--navy);
     flex-direction: column;
     padding: 8px 20px 16px;
+    z-index: 20;
+    box-shadow: 0 12px 24px rgba(0,0,0,.25);
   }
   .nav-links.open { display: flex; }
-  .nav { position: relative; }
+}
+@media (max-width: 560px) {
   .about-grid, .classes-grid { grid-template-columns: 1fr; }
   .section { padding: 28px 16px; }
+  .logo { font-size: .95rem; }
 }
 
 /* Attendance — Phase 3 */
 .attendance-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin: 16px 0;
 }
@@ -378,7 +400,8 @@ h3 { margin: 0 0 6px; color: var(--navy); }
   font-weight: 700;
 }
 .result-summary-value { margin: 0; font-size: 1.25rem; font-weight: 800; }
-.table-wrap { overflow-x: auto; margin-top: 8px; }
+.table-wrap { overflow-x: auto; margin-top: 8px; max-width: 100%; width: 100%; }
+.result-table { min-width: 560px; }
 .result-table {
   width: 100%;
   border-collapse: collapse;
@@ -445,9 +468,9 @@ h3 { margin: 0 0 6px; color: var(--navy); }
 .contact-form button { justify-self: start; margin-top: 8px; }
 
 
-/* Login — 4 demo roles */
-body.logged-out main, body.logged-out .footer { display: none; }
-body.logged-out .nav-links, body.logged-out .user-area { display: none !important; }
+/* Login — demo roles. Logged out, the page is a public landing page:
+   hero, programmes, About, Contact + login card. Data sections are hidden
+   by JS (hidden attribute) until login (C2/M5). */
 #loginScreen { display: none; }
 body.logged-out #loginScreen {
   display: flex;
@@ -514,6 +537,30 @@ body.logged-out #loginScreen {
 .login-pick:hover { border-color: var(--teal); background: #e6fafa; }
 .login-pick strong { color: var(--navy); font-size: 1rem; }
 
+/* In-page confirm dialog (M3) */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 61, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+.confirm-overlay[hidden] { display: none; }
+.confirm-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 12px 32px rgba(10, 25, 47, .25);
+}
+.confirm-card h3 { margin-bottom: 8px; }
+.confirm-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+
 /* Header user chip + logout */
 .user-area { display: flex; align-items: center; gap: 10px; }
 .user-chip {
@@ -525,7 +572,12 @@ body.logged-out #loginScreen {
   font-size: .9rem;
   font-weight: 600;
   white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.user-area { flex-shrink: 0; }
+.user-area .btn-small { margin-top: 0; white-space: nowrap; }
 .user-area .btn-outline { color: #fff; border-color: rgba(255, 255, 255, .5); }
 .user-area .btn-outline:hover { background: rgba(255, 255, 255, .12); }
 
@@ -559,6 +611,9 @@ body.logged-out #loginScreen {
 @media (max-width: 820px) {
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
   .my-record-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 820px) {
+  .attendance-summary { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 560px) {
   .attendance-summary { grid-template-columns: repeat(2, 1fr); }

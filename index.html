@@ -46,6 +46,7 @@
         <button class="btn btn-primary" type="submit">Login (demo)</button>
         <p class="login-error" id="loginError" role="alert" hidden></p>
       </form>
+      <p class="muted" id="loginHint" role="status" hidden></p>
       <p class="muted login-accounts-title">Demo accounts — kisi ek par tap karein:</p>
       <div class="login-accounts">
         <button type="button" class="login-pick" data-user="principal"><strong>&#127970; Principal</strong><span>Reports dashboard — graphs &amp; fees, view only</span><span class="muted">principal / demo123</span></button>
@@ -65,7 +66,7 @@
       <h2>College at a glance</h2>
       <p class="muted" id="dashboardNote">Ye dashboard sirf Principal aur Admin ko dikhta hai — saare numbers neeche wale Fees, Students aur Results records se live bante hain. Kuch edit nahi hota yahan se.</p>
       <div class="kpi-grid" id="kpiGrid">
-        <article class="kpi-card kpi-indigo"><p class="kpi-label">Total Students</p><p class="kpi-value" id="kpiStudents">419</p><p class="muted">6 programs &middot; demo data</p></article>
+        <article class="kpi-card kpi-indigo"><p class="kpi-label">Total Students</p><p class="kpi-value" id="kpiStudents">460</p><p class="muted">7 programs &middot; college-wide sample total</p></article>
         <article class="kpi-card kpi-emerald"><p class="kpi-label">Fees Collected</p><p class="kpi-value" id="kpiCollected">Rs. 0</p><p class="muted" id="kpiCollectedSub">— paid</p></article>
         <article class="kpi-card kpi-amber"><p class="kpi-label">Fees Pending</p><p class="kpi-value" id="kpiPending">Rs. 0</p><p class="muted" id="kpiPendingSub">— pending</p></article>
         <article class="kpi-card kpi-violet"><p class="kpi-label">Overall Result</p><p class="kpi-value" id="kpiResult">—</p><p class="muted" id="kpiResultSub">Class average &middot; demo data</p></article>
@@ -99,16 +100,16 @@
         <p>A simple College Management System for Government Girls Degree College, Sukkur. All 5 phases are complete — programs list, student records, attendance, fees record and result report — for Intermediate XI &amp; XII and degree programs, with main subjects and student numbers as sample demo data.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#classes">View Programs</a>
-          <a class="btn btn-outline" href="#students">Student Records</a>
-          <a class="btn btn-outline" href="#results">Result Report</a>
+          <a class="btn btn-outline" id="heroStudentsBtn" href="#students">Student Records</a>
+          <a class="btn btn-outline" id="heroResultsBtn" href="#results">Result Report</a>
         </div>
         <p class="hero-note">All 5 phases complete &middot; HTML, CSS &amp; JavaScript only &middot; Demo login — try principal / admin / teacher / student / parent, password demo123</p>
       </div>
       <div class="hero-card">
         <p class="hero-card-big">&#127891;</p>
         <p><strong>Intermediate &amp; Degree Programs</strong></p>
-        <p><strong id="heroStudents">419</strong> students &middot; <strong>6</strong> programs</p>
-        <p class="muted">Demo data — student numbers on this page are sample data for demonstration only.</p>
+        <p><strong id="heroStudents">9</strong> students &middot; <strong id="heroPrograms">7</strong> programs</p>
+        <p class="muted">Demo roster — 9 sample students across 7 programmes. Programme totals below are college-wide sample totals, for demonstration only.</p>
       </div>
     </section>
 
@@ -127,7 +128,7 @@
       <div class="about-grid">
         <article class="about-card">
           <h3>&#128197; Phase 1 — Done</h3>
-          <p>Landing page and programs list (FSc, FA, ADS, BS, BSc). Responsive layout, mobile menu, program search.</p>
+          <p>Landing page and programs list (FSc, FA, ADS, BS, BSc, B.Com). Responsive layout, mobile menu, program search.</p>
         </article>
         <article class="about-card">
           <h3>&#128100; Phase 2 — Done</h3>
@@ -155,11 +156,11 @@
     <!-- PROGRAMS -->
     <section id="classes" class="section container">
       <h2>Programs</h2>
-      <p class="muted">Intermediate (XI &amp; XII) and degree programs. Use the search box to find a program. All student numbers below are sample demo data.</p>
+      <p class="muted">Intermediate (XI &amp; XII) and degree programs. Use the search box to find a program. Student numbers below are college-wide sample totals for demonstration only — the demo roster itself has 9 students.</p>
       <div class="search-row">
         <label for="classSearch">Search programs</label>
         <input type="search" id="classSearch" placeholder="Try: ADS Science, or FSc…" autocomplete="off">
-        <p class="muted" id="classCount">Showing 6 programs</p>
+        <p class="muted" id="classCount">Showing 7 programs</p>
       </div>
       <div class="classes-grid" id="classesGrid">
         <article class="class-card" data-search="fsc pre-medical xi xii intermediate biology chemistry physics english">
@@ -167,7 +168,6 @@
           <h3>Intermediate — XI &amp; XII</h3>
           <p><strong>Subjects:</strong> Biology, Chemistry, Physics, English</p>
           <p><strong>Students:</strong> 96</p>
-          <p><strong>In-charge:</strong> In-charge (demo)</p>
           <p class="muted">Demo data</p>
         </article>
         <article class="class-card" data-search="fsc pre-engineering xi xii intermediate mathematics maths chemistry physics english">
@@ -175,7 +175,6 @@
           <h3>Intermediate — XI &amp; XII</h3>
           <p><strong>Subjects:</strong> Mathematics, Chemistry, Physics, English</p>
           <p><strong>Students:</strong> 84</p>
-          <p><strong>In-charge:</strong> In-charge (demo)</p>
           <p class="muted">Demo data</p>
         </article>
         <article class="class-card" data-search="fa humanities xi xii intermediate civics economics education english">
@@ -183,7 +182,6 @@
           <h3>Intermediate — XI &amp; XII</h3>
           <p><strong>Subjects:</strong> Civics, Economics, Education, English</p>
           <p><strong>Students:</strong> 62</p>
-          <p><strong>In-charge:</strong> In-charge (demo)</p>
           <p class="muted">Demo data</p>
         </article>
         <article class="class-card" data-search="ads science associate degree part i ii salu english bio-chemistry biochemistry zoology botany">
@@ -191,7 +189,6 @@
           <h3>Associate Degree — Part I &amp; II</h3>
           <p><strong>Subjects:</strong> English, Bio-Chemistry, Zoology, Botany</p>
           <p><strong>Students:</strong> 74</p>
-          <p><strong>In-charge:</strong> In-charge (demo)</p>
           <p class="muted">Demo data</p>
         </article>
         <article class="class-card" data-search="bs computer science 4 year degree programming data structures databases web development">
@@ -199,7 +196,6 @@
           <h3>4-Year Degree</h3>
           <p><strong>Subjects:</strong> Programming, Data Structures, Databases, Web Development</p>
           <p><strong>Students:</strong> 58</p>
-          <p><strong>In-charge:</strong> In-charge (demo)</p>
           <p class="muted">Demo data</p>
         </article>
         <article class="class-card" data-search="bsc science 2 year degree botany zoology chemistry english">
@@ -207,7 +203,13 @@
           <h3>2-Year Degree</h3>
           <p><strong>Subjects:</strong> Botany, Zoology, Chemistry, English</p>
           <p><strong>Students:</strong> 45</p>
-          <p><strong>In-charge:</strong> In-charge (demo)</p>
+          <p class="muted">Demo data</p>
+        </article>
+        <article class="class-card" data-search="bcom b.com commerce 2 year degree accounting business maths economics english">
+          <p class="class-num">B.Com Commerce</p>
+          <h3>2-Year Degree</h3>
+          <p><strong>Subjects:</strong> Accounting, Business Maths, Economics, English</p>
+          <p><strong>Students:</strong> 41</p>
           <p class="muted">Demo data</p>
         </article>
       </div>
@@ -215,7 +217,7 @@
     </section>
 
     <!-- STUDENTS — PHASE 2 -->
-    <section id="students" class="section container">
+    <section id="students" class="section container" hidden>
       <h2>Students</h2>
       <p class="muted">Student records — add a student and search students by name or program. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser. All students below are sample demo data — generic names only, no real college students.</p>
       <p class="view-only-note" id="studentsViewNote" hidden>View only — Teacher account: students dekh sakte hain, add ya remove nahi kar sakte. Sirf Admin add ya remove kar sakta hai.</p>
@@ -271,7 +273,7 @@
     </section>
 
 <!-- ATTENDANCE — PHASE 3 -->
-    <section id="attendance" class="section container">
+    <section id="attendance" class="section container" hidden>
       <h2>Attendance</h2>
       <p class="muted">Mark attendance — pick a program and a date, mark each student Present or Absent, then save. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser. All students below are sample demo data — generic names only, no real college students.</p>
       <form id="attendanceForm" class="contact-form">
@@ -305,7 +307,7 @@
     </section>
 
 <!-- FEES — PHASE 4 -->
-    <section id="fees" class="section container">
+    <section id="fees" class="section container" hidden>
       <h2>Fees Record</h2>
       <p class="muted">Fees record — choose a program to see its students' fee status, and mark a fee as Paid. Fee amounts are sample demo amounts only (per term, in PKR) — not the college's real fees. Records sync in realtime with the mobile app (Firebase, demo only); an offline copy is kept in this browser. All students below are sample demo data — generic names only, no real college students.</p>
       <p class="view-only-note" id="feesViewNote" hidden>View only — Teacher account: fees dekh sakte hain, Paid mark nahi kar sakte. Sirf Admin fees change kar sakta hai.</p>
@@ -323,7 +325,7 @@
         <article class="summary-card">
           <p class="summary-label">Fee records shown</p>
           <p class="summary-value" id="feesTotal">0</p>
-          <p class="muted">Sample demo data</p>
+          <p class="muted" id="feesScopeLabel">All programmes · sample demo data</p>
         </article>
       </div>
       <div class="collection-bar-wrap">
@@ -351,13 +353,14 @@
         <p class="muted" id="feeCount">Showing 0 fee records</p>
       </div>
       <div class="fees-list" id="feesList"></div>
+      <p class="muted" id="feeNote" role="status"></p>
       <p class="muted" id="feeNoResults" hidden>No fee record matches. Try another program or status.</p>
       <button class="btn btn-outline" id="resetFees" type="button">Reset demo fees</button>
       <p class="muted">Demo data — fee amounts are samples only, not real college fees. Paid marks sync to the mobile app too, and stay until you reset them.</p>
     </section>
 
 <!-- RESULTS — PHASE 5 -->
-    <section id="results" class="section container">
+    <section id="results" class="section container" hidden>
       <h2>Results</h2>
       <p class="muted">Result report — choose a program to see sample demo students with marks and grades. Grades are calculated from the percentage: A (85%+), B (70–84%), C (60–69%), D (50–59%), E (40–49%), Fail (below 40%). Pass means 40% or more. All marks below are sample demo data — generic names only, no real college students or results.</p>
       <div class="search-row">
@@ -412,6 +415,18 @@
       </form>
     </section>
   </main>
+
+  <!-- In-page confirm dialog (M3) — used before every destructive action -->
+  <div class="confirm-overlay" id="confirmDialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-card">
+      <h3 id="confirmTitle">Confirm karein?</h3>
+      <p id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button class="btn btn-primary" id="confirmYes" type="button">Yes, confirm</button>
+        <button class="btn btn-outline" id="confirmNo" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="footer">
     <div class="container">
